@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 // RunPreflightChecks ensures the current directory is a Git repository and has no uncommitted changes.
@@ -31,7 +32,7 @@ func RunPreflightChecks() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("unable to determine git root")
 	}
-	return string(output), nil
+	return strings.TrimSpace(string(output)), nil
 }
 
 // CommitAndTag stages the version file, commits it with the version as the message, and creates a Git tag.
