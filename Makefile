@@ -3,20 +3,20 @@
 # Go build flags
 LDFLAGS := -s -w -X main.Version=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
-build: clean prepare bin/version
+build: clean prepare bin/foonver
 
-bin/version:
-	go build -ldflags="$(LDFLAGS)" -o bin/version ./cmd/version
+bin/foonver:
+	go build -ldflags="$(LDFLAGS)" -o bin/foonver ./cmd/version
 
 dev: clean prepare
-	go build -o bin/version ./cmd/version
+	go build -o bin/foonver ./cmd/version
 
 prepare:
 	go mod download
 	go mod tidy
 
 install: build
-	cp bin/version ~/.local/bin/
+	cp bin/foonver ~/.local/bin/
 
 clean:
 	rm -rf bin
