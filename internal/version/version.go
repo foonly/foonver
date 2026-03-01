@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"strings"
 
@@ -24,9 +25,10 @@ var versionFiles = []string{
 
 // DiscoverVersion searches for a version file in the current directory and returns its path,
 // the parsed version, and its raw content.
-func DiscoverVersion() (string, *semver.Version, []byte, error) {
+func DiscoverVersion(projectRoot string) (string, *semver.Version, []byte, error) {
 	for _, file := range versionFiles {
-		content, err := os.ReadFile(file)
+		filePath := path.Join(projectRoot, file)
+		content, err := os.ReadFile(filePath)
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue
@@ -44,7 +46,7 @@ func DiscoverVersion() (string, *semver.Version, []byte, error) {
 			return "", nil, nil, fmt.Errorf("invalid semver string '%s' in %s: %w", vStr, file, err)
 		}
 
-		return file, v, content, nil
+		return filePath, v, content, nil
 	}
 
 	return "", nil, nil, fmt.Errorf("no valid version file found")

@@ -21,12 +21,13 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := git.RunPreflightChecks(); err != nil {
+	projectRoot, err := git.RunPreflightChecks()
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fileName, currentVersion, fileContent, err := version.DiscoverVersion()
+	fileName, currentVersion, fileContent, err := version.DiscoverVersion(projectRoot)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
