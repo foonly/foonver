@@ -1,10 +1,8 @@
-package main
+package version
 
 import (
 	"os"
 	"testing"
-
-	"foonly.dev/foonver/internal/version"
 
 	"github.com/Masterminds/semver/v3"
 )
@@ -77,7 +75,7 @@ func TestExtractVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := version.ExtractVersion(tt.filename, []byte(tt.content))
+			got, err := extractVersion(tt.filename, []byte(tt.content))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("extractVersion() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -132,7 +130,7 @@ func TestDetermineNextVersionTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := version.DetermineNextVersion(current, tt.target)
+			got, err := DetermineNextVersion(current, tt.target)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("determineNextVersion() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -192,7 +190,7 @@ func TestUpdateVersionFile(t *testing.T) {
 			}
 			defer os.Remove(f.Name())
 
-			err = version.UpdateVersionFile(f.Name(), tt.oldVersion, tt.newVersion, []byte(tt.content))
+			err = UpdateVersionFile(f.Name(), tt.oldVersion, tt.newVersion, []byte(tt.content))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("updateVersionFile() error = %v, wantErr %v", err, tt.wantErr)
 			}

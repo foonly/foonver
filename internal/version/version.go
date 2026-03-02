@@ -36,7 +36,7 @@ func DiscoverVersion(projectRoot string) (string, *semver.Version, []byte, error
 			return "", nil, nil, fmt.Errorf("error reading %s: %w", file, err)
 		}
 
-		vStr, err := ExtractVersion(file, content)
+		vStr, err := extractVersion(file, content)
 		if err != nil {
 			continue // Might be the wrong format, try next file
 		}
@@ -54,7 +54,7 @@ func DiscoverVersion(projectRoot string) (string, *semver.Version, []byte, error
 
 // ExtractVersion extracts a version string from the given file content based on the filename's extension.
 // It supports .json, .toml, .txt, and .md files.
-func ExtractVersion(filename string, content []byte) (string, error) {
+func extractVersion(filename string, content []byte) (string, error) {
 	switch {
 	case strings.HasSuffix(filename, ".json"):
 		var data map[string]any

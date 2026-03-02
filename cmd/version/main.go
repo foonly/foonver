@@ -15,8 +15,6 @@ var Version = "dev"
 
 func main() {
 	if len(os.Args) > 1 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
-		fmt.Println("foonver - Version Management Utility")
-		fmt.Printf("Version: %s\n\n", Version)
 		fmt.Println("Usage: foonver [major|minor|patch|<specific-version>]")
 		os.Exit(0)
 	}

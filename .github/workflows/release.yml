@@ -1,0 +1,26 @@
+name: foonver build
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.25.x
+      - name: Make Test
+        run: make test
+      - name: Make Build
+        run: make build
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "bin/foonver"
