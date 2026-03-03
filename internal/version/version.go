@@ -12,7 +12,9 @@ import (
 	"regexp"
 	"strings"
 
+	"foonly.dev/foonver/internal/git"
 	"github.com/Masterminds/semver/v3"
+	"github.com/spf13/cobra"
 )
 
 var versionFiles = []string{
@@ -23,9 +25,68 @@ var versionFiles = []string{
 	"version.md",
 }
 
-// DiscoverVersion searches for a version file in the current directory and returns its path,
+func RunVersion(cmd *cobra.Command, args []string) error {
+
+	projectRoot, err := git.RunPreflightChecks()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fileName, currentVersion, fileContent, err := discoverVersion(projectRoot)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Found version %s in %s\n", currentVersion.Original(), fileName)
+
+	fmt.Printf("Command %s\n", cmd.Name())
+
+	// WIP
+	os.Exit(0)
+
+	target := ""
+	if len(os.Args) > 1 {
+		target = os.Args[1]
+	}
+
+	nextVersion, err := determineNextVersion(currentVersion, target)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error determining next version: %v\n", err)
+		os.Exit(1)
+	}
+
+	nextVersionStr := nextVersion.String()
+	if strings.HasPrefix(currentVersion.Original(), "v") {
+		nextVersionStr = "v" + nextVersionStr
+	}
+
+	if currentVersion.String() == nextVersion.String() {
+		fmt.Println("Version is already up to date.")
+		os.Exit(0)
+	}
+
+	fmt.Printf("Bumping version from %s to %s\n", currentVersion.Original(), nextVersionStr)
+
+	if err := updateVersionFile(fileName, currentVersion.Original(), nextVersionStr, fileContent); err != nil {
+		fmt.Fprintf(os.Stderr, "Error updating version file: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := git.CommitAndTag(fileName, nextVersionStr); err != nil {
+		fmt.Fprintf(os.Stderr, "Git error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Successfully bumped version to %s\n", nextVersionStr)
+
+	return nil
+}
+
+// discoverVersion searches for a version file in the current directory and returns its path,
 // the parsed version, and its raw content.
-func DiscoverVersion(projectRoot string) (string, *semver.Version, []byte, error) {
+func discoverVersion(projectRoot string) (string, *semver.Version, []byte, error) {
 	for _, file := range versionFiles {
 		filePath := path.Join(projectRoot, file)
 		content, err := os.ReadFile(filePath)
@@ -89,9 +150,9 @@ func extractVersion(filename string, content []byte) (string, error) {
 	return "", fmt.Errorf("unsupported file type")
 }
 
-// DetermineNextVersion calculates the next version based on a target ("major", "minor", "patch",
+// determineNextVersion calculates the next version based on a target ("major", "minor", "patch",
 // or a specific version string) or automatically by analyzing Git commit messages.
-func DetermineNextVersion(current *semver.Version, target string) (*semver.Version, error) {
+func determineNextVersion(current *semver.Version, target string) (*semver.Version, error) {
 	if target != "" {
 		switch strings.ToLower(target) {
 		case "major":
@@ -166,9 +227,9 @@ func DetermineNextVersion(current *semver.Version, target string) (*semver.Versi
 	return &next, nil
 }
 
-// UpdateVersionFile replaces the old version string with the new version string in the specified file
+// updateVersionFile replaces the old version string with the new version string in the specified file
 // and writes the changes back to disk, attempting to preserve file formatting.
-func UpdateVersionFile(filename, oldVersion, newVersion string, content []byte) error {
+func updateVersionFile(filename, oldVersion, newVersion string, content []byte) error {
 	var newContent []byte
 
 	switch {

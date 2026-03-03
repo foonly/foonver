@@ -130,7 +130,7 @@ func TestDetermineNextVersionTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := DetermineNextVersion(current, tt.target)
+			got, err := determineNextVersion(current, tt.target)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("determineNextVersion() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -190,7 +190,7 @@ func TestUpdateVersionFile(t *testing.T) {
 			}
 			defer os.Remove(f.Name())
 
-			err = UpdateVersionFile(f.Name(), tt.oldVersion, tt.newVersion, []byte(tt.content))
+			err = updateVersionFile(f.Name(), tt.oldVersion, tt.newVersion, []byte(tt.content))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("updateVersionFile() error = %v, wantErr %v", err, tt.wantErr)
 			}

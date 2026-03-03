@@ -1,8 +1,6 @@
 package commands
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
@@ -18,8 +16,6 @@ var rootCmd = &cobra.Command{
 	Long:  "foonver is a lightweight CLI utility for automated Semantic Versioning (SemVer) management.",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 
-		Version := "foo"
-		fmt.Printf("Version: %s\n\n", Version)
 	},
 }
 
