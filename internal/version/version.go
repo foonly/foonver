@@ -27,14 +27,7 @@ var versionFiles = []string{
 }
 
 func RunVersion(cmd *cobra.Command, args []string) error {
-
-	projectRoot, err := git.RunPreflightChecks()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	fileName, currentVersion, fileContent, err := discoverVersion(projectRoot)
+	fileName, currentVersion, fileContent, err := discoverVersion()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -77,14 +70,25 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Successfully bumped version to %s\n", nextVersionStr)
 
+	if config.Conf.Push {
+		if !git.Info.HasRemote {
+			fmt.Fprintf(os.Stderr, "Cannot push: no git remote configured\n")
+			os.Exit(1)
+		}
+		if err := git.PushTags(); err != nil {
+			fmt.Fprintf(os.Stderr, "Git push error: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	return nil
 }
 
 // discoverVersion searches for a version file in the current directory and returns its path,
 // the parsed version, and its raw content.
-func discoverVersion(projectRoot string) (string, *semver.Version, []byte, error) {
+func discoverVersion() (string, *semver.Version, []byte, error) {
 	for _, file := range versionFiles {
-		filePath := path.Join(projectRoot, file)
+		filePath := path.Join(git.Info.RootDir, file)
 		content, err := os.ReadFile(filePath)
 		if err != nil {
 			if os.IsNotExist(err) {

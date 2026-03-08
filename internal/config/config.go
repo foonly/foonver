@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 
+	"foonly.dev/foonver/internal/git"
 	"github.com/adrg/xdg"
 	mapstructure "github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
@@ -71,6 +72,7 @@ func Init() {
 
 	viper.AddConfigPath("/etc/foonver")
 	viper.AddConfigPath(xdg.ConfigHome)
+	viper.AddConfigPath(git.Info.RootDir)
 
 	viper.SetDefault("push", false)
 	viper.SetDefault("verbosity", "normal")
@@ -109,10 +111,6 @@ func Init() {
 	}
 
 	processFlags()
-
-	fmt.Printf("push=%v\n", Conf.Push)
-	fmt.Printf("verbosity=%v\n", Conf.Verbosity)
-
 }
 
 func processFlags() {
