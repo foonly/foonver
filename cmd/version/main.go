@@ -11,6 +11,7 @@ import (
 var Version = "dev"
 
 func main() {
+
 	fmt.Printf("Version: %s\n\n", Version)
 
 	commands.Execute()

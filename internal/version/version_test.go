@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"foonly.dev/foonver/internal/config"
 	"github.com/Masterminds/semver/v3"
 )
 
@@ -92,37 +93,43 @@ func TestDetermineNextVersionTarget(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		target  string
+		cmd     string
+		arg     string
 		want    string
 		wantErr bool
 	}{
 		{
 			name:    "major",
-			target:  "major",
+			cmd:     "major",
+			arg:     "",
 			want:    "2.0.0",
 			wantErr: false,
 		},
 		{
 			name:    "minor",
-			target:  "minor",
+			cmd:     "minor",
+			arg:     "",
 			want:    "1.3.0",
 			wantErr: false,
 		},
 		{
 			name:    "patch",
-			target:  "patch",
+			cmd:     "patch",
+			arg:     "",
 			want:    "1.2.4",
 			wantErr: false,
 		},
 		{
 			name:    "specific version",
-			target:  "2.0.0-rc.1",
+			cmd:     "ver",
+			arg:     "2.0.0-rc.1",
 			want:    "2.0.0-rc.1",
 			wantErr: false,
 		},
 		{
 			name:    "invalid specific version",
-			target:  "invalid",
+			cmd:     "ver",
+			arg:     "invalid",
 			want:    "",
 			wantErr: true,
 		},
@@ -130,13 +137,115 @@ func TestDetermineNextVersionTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := determineNextVersion(current, tt.target)
+			got, err := determineNextVersion(current, tt.cmd, tt.arg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("determineNextVersion() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && got.String() != tt.want {
 				t.Errorf("determineNextVersion() got = %v, want %v", got.String(), tt.want)
+			}
+		})
+	}
+}
+
+func TestParseCommit(t *testing.T) {
+	originalParser := config.Conf.Parser
+	t.Cleanup(func() {
+		config.Conf.Parser = originalParser
+	})
+
+	tests := []struct {
+		name   string
+		parser string
+		msg    string
+		major  bool
+		minor  bool
+		patch  bool
+	}{
+		{
+			name:   "angular parser detects breaking change with bang",
+			parser: "angular",
+			msg:    "feat(api)!: change response format",
+			major:  true,
+			minor:  false,
+			patch:  false,
+		},
+		{
+			name:   "angular parser detects feat as minor",
+			parser: "angular",
+			msg:    "feat(ui): add dark mode",
+			major:  false,
+			minor:  true,
+			patch:  false,
+		},
+		{
+			name:   "generic parser treats unknown message as patch",
+			parser: "generic",
+			msg:    "chore: update dependencies",
+			major:  false,
+			minor:  false,
+			patch:  true,
+		},
+		{
+			name:   "angular parser treats unknown message as none",
+			parser: "angular",
+			msg:    "chore: update dependencies",
+			major:  false,
+			minor:  false,
+			patch:  false,
+		},
+		{
+			name:   "all parsers gives major precedence over generic patch",
+			parser: "all",
+			msg:    "feat(core)!: rewrite parser",
+			major:  true,
+			minor:  true,
+			patch:  false,
+		},
+		{
+			name:   "all parsers yields minor when angular minor and generic minor",
+			parser: "all",
+			msg:    "feat: add CLI command",
+			major:  false,
+			minor:  true,
+			patch:  false,
+		},
+		{
+			name:   "all parsers can produce minor and patch together",
+			parser: "all",
+			msg:    "fix: correct panic on nil input",
+			major:  false,
+			minor:  false,
+			patch:  true,
+		},
+		{
+			name:   "angular detect breaking in footer",
+			parser: "angular",
+			msg:    "feat: add config parser\nBREAKING CHANGE: config file format changed",
+			major:  true,
+			minor:  false,
+			patch:  false,
+		},
+		{
+			name:   "generic user breaking",
+			parser: "generic",
+			msg:    "breaking: change in project config",
+			major:  true,
+			minor:  false,
+			patch:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config.Conf.Parser = tt.parser
+
+			major, minor, patch := parseCommit(tt.msg)
+
+			if major != tt.major || minor != tt.minor || patch != tt.patch {
+				t.Errorf("parseCommit(%q) = (major=%v, minor=%v, patch=%v), want (major=%v, minor=%v, patch=%v)",
+					tt.msg, major, minor, patch, tt.major, tt.minor, tt.patch)
 			}
 		})
 	}

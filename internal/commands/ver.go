@@ -8,6 +8,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var autoCommand = &cobra.Command{
+	Use:   "auto",
+	Short: "Determine the version by git commits (default)",
+	RunE:  version.RunVersion,
+}
+
 var majorCommand = &cobra.Command{
 	Use:   "major",
 	Short: "Bump the major version",
@@ -34,6 +40,7 @@ var verCommand = &cobra.Command{
 }
 
 func init() {
+	rootCmd.AddCommand(autoCommand)
 	rootCmd.AddCommand(majorCommand)
 	rootCmd.AddCommand(minorCommand)
 	rootCmd.AddCommand(patchCommand)
@@ -41,10 +48,7 @@ func init() {
 }
 
 func validateVerArg(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 {
-		return nil
-	}
-	if len(args) > 1 {
+	if len(args) == 0 || len(args) > 1 {
 		return fmt.Errorf("expected semantic version")
 	}
 

@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 
+	"foonly.dev/foonver/internal/config"
 	"foonly.dev/foonver/internal/git"
 	"github.com/Masterminds/semver/v3"
 	"github.com/spf13/cobra"
@@ -41,17 +42,12 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Found version %s in %s\n", currentVersion.Original(), fileName)
 
-	fmt.Printf("Command %s\n", cmd.Name())
-
-	// WIP
-	os.Exit(0)
-
-	target := ""
-	if len(os.Args) > 1 {
-		target = os.Args[1]
+	newVersion := ""
+	if len(args) > 0 {
+		newVersion = args[0]
 	}
 
-	nextVersion, err := determineNextVersion(currentVersion, target)
+	nextVersion, err := determineNextVersion(currentVersion, cmd.Name(), newVersion)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error determining next version: %v\n", err)
 		os.Exit(1)
@@ -152,23 +148,37 @@ func extractVersion(filename string, content []byte) (string, error) {
 
 // determineNextVersion calculates the next version based on a target ("major", "minor", "patch",
 // or a specific version string) or automatically by analyzing Git commit messages.
-func determineNextVersion(current *semver.Version, target string) (*semver.Version, error) {
-	if target != "" {
-		switch strings.ToLower(target) {
-		case "major":
-			v := current.IncMajor()
-			return &v, nil
-		case "minor":
-			v := current.IncMinor()
-			return &v, nil
-		case "patch":
-			v := current.IncPatch()
-			return &v, nil
-		default:
-			return semver.NewVersion(target)
-		}
+func determineNextVersion(current *semver.Version, target string, setVersion string) (*semver.Version, error) {
+	action := strings.ToLower(target)
+
+	if action == "ver" {
+		return semver.NewVersion(setVersion)
 	}
 
+	if action == "auto" {
+		auto, err := autoVersion()
+		if err != nil {
+			return nil, err
+		}
+		action = auto
+	}
+
+	var next semver.Version
+	switch action {
+	case "major":
+		next = current.IncMajor()
+	case "minor":
+		next = current.IncMinor()
+	case "patch":
+		next = current.IncPatch()
+	default:
+		next = *current
+	}
+	return &next, nil
+
+}
+
+func autoVersion() (string, error) {
 	// Automatic mode based on Git history
 	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
 	lastTag, err := cmd.Output()
@@ -184,12 +194,12 @@ func determineNextVersion(current *semver.Version, target string) (*semver.Versi
 
 	logOutput, err := logCmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get git log: %w", err)
+		return "", fmt.Errorf("failed to get git log: %w", err)
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(logOutput)), "\n")
 	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
-		return current, nil // No new commits
+		return "", nil // No new commits
 	}
 
 	bumpMajor := false
@@ -213,18 +223,83 @@ func determineNextVersion(current *semver.Version, target string) (*semver.Versi
 		}
 	}
 
-	var next semver.Version
 	if bumpMajor {
-		next = current.IncMajor()
+		return "major", nil
 	} else if bumpMinor {
-		next = current.IncMinor()
+		return "minor", nil
 	} else if bumpPatch {
-		next = current.IncPatch()
-	} else {
-		next = *current
+		return "patch", nil
 	}
 
-	return &next, nil
+	return "", nil
+}
+
+func parseCommit(msg string) (bool, bool, bool) {
+	bumpMajor := false
+	bumpMinor := false
+	bumpPatch := false
+
+	parsers := make([]string, 2)
+	parsers[0] = "angular"
+	parsers[1] = "generic"
+
+	for _, parser := range parsers {
+		if config.Conf.Parser != parser && config.Conf.Parser != "all" {
+			continue
+		}
+
+		var major, minor, patch bool
+		switch parser {
+		case "angular":
+			major, minor, patch = parseAngular(msg)
+		case "generic":
+			major, minor, patch = parseGeneric(msg)
+		}
+		if major {
+			bumpMajor = true
+		} else if minor {
+			bumpMinor = true
+		} else if patch {
+			bumpPatch = true
+		}
+	}
+	return bumpMajor, bumpMinor, bumpPatch
+}
+
+func parseGeneric(msg string) (bool, bool, bool) {
+	msg = strings.ToLower(strings.TrimSpace(msg))
+
+	if strings.HasPrefix(msg, "breaking") || strings.Contains(msg, "breaking change:") {
+		return true, false, false
+	} else if strings.HasPrefix(msg, "feat") || strings.Contains(msg, "new feature:") {
+		return false, true, false
+	}
+
+	return false, false, true
+}
+
+var findTypeScope = regexp.MustCompile(`(?i)^([a-z]+)(?:\([^)]+\))?(!)?:`)
+
+func parseAngular(msg string) (bool, bool, bool) {
+	if strings.Contains(msg, "BREAKING CHANGE:") {
+		return true, false, false
+	}
+
+	matches := findTypeScope.FindStringSubmatch(msg)
+	if len(matches) > 0 {
+		if len(matches) > 2 && matches[2] == "!" {
+			// Has bang, which indicates a breaking change
+			return true, false, false
+		}
+		switch strings.ToLower(matches[1]) {
+		case "feat":
+			return false, true, false
+		case "fix":
+			return false, false, true
+		}
+	}
+
+	return false, false, false
 }
 
 // updateVersionFile replaces the old version string with the new version string in the specified file
