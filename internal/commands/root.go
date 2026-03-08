@@ -31,8 +31,6 @@ var rootCmd = &cobra.Command{
 		fmt.Printf("verbosity=%v\n", config.Conf.Verbosity)
 		fmt.Printf("parser=%v\n", config.Conf.Parser)
 
-		fmt.Printf("Git info: %+v\n", git.Info)
-
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
