@@ -216,13 +216,14 @@ func autoVersion() (string, error) {
 		if len(parts) < 2 {
 			continue
 		}
-		msg := strings.ToLower(strings.TrimSpace(parts[1]))
+		msg := strings.TrimSpace(parts[1])
 
-		if strings.HasPrefix(msg, "breaking change") || strings.Contains(msg, "breaking change") {
+		major, minor, patch := parseCommit(msg)
+		if major {
 			bumpMajor = true
-		} else if strings.HasPrefix(msg, "feat:") || strings.HasPrefix(msg, "feature") || strings.HasPrefix(msg, "new feature") {
+		} else if minor {
 			bumpMinor = true
-		} else {
+		} else if patch {
 			bumpPatch = true
 		}
 	}
@@ -271,7 +272,7 @@ func parseCommit(msg string) (bool, bool, bool) {
 }
 
 func parseGeneric(msg string) (bool, bool, bool) {
-	msg = strings.ToLower(strings.TrimSpace(msg))
+	msg = strings.ToLower(msg)
 
 	if strings.HasPrefix(msg, "breaking") || strings.Contains(msg, "breaking change:") {
 		return true, false, false
