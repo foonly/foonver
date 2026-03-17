@@ -6,20 +6,13 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"foonly.dev/foonver/internal/config"
 )
-
-type GitInfo struct {
-	Ok        bool
-	Clean     bool
-	HasRemote bool
-	RootDir   string
-}
-
-var Info GitInfo
 
 // RunPreflightChecks ensures the current directory is a Git repository and has no uncommitted changes.
 func RunPreflightChecks() error {
-	Info = GitInfo{
+	config.Conf.Info = config.GitInfo{
 		Ok:        true,
 		Clean:     true,
 		HasRemote: false,
@@ -30,31 +23,31 @@ func RunPreflightChecks() error {
 	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
 	output, err := cmd.Output()
 	if err != nil {
-		Info.Ok = false
+		config.Conf.Info.Ok = false
 		return fmt.Errorf("not inside a Git repository")
 	}
-	Info.RootDir = strings.TrimSpace(string(output))
+	config.Conf.Info.RootDir = strings.TrimSpace(string(output))
 
 	// Check for remotes
 	cmd = exec.Command("git", "remote")
 	output, err = cmd.Output()
 	if err != nil {
-		Info.Ok = false
+		config.Conf.Info.Ok = false
 		return fmt.Errorf("failed to check git remotes: %w", err)
 	}
 	if len(bytes.TrimSpace(output)) > 0 {
-		Info.HasRemote = true
+		config.Conf.Info.HasRemote = true
 	}
 
 	// Check for clean working directory
 	cmd = exec.Command("git", "status", "--porcelain")
 	output, err = cmd.Output()
 	if err != nil {
-		Info.Ok = false
+		config.Conf.Info.Ok = false
 		return fmt.Errorf("failed to check git status: %w", err)
 	}
 	if len(bytes.TrimSpace(output)) > 0 {
-		Info.Clean = false
+		config.Conf.Info.Clean = false
 		return fmt.Errorf("git working directory not clean. Commit or stash changes first")
 	}
 	return nil
@@ -68,16 +61,17 @@ func CommitAndTag(filename, version string) error {
 		return fmt.Errorf("git add failed: %w", err)
 	}
 
+	// Append the prefix to version.
+	versionString := fmt.Sprintf("%s%s", config.Conf.Prefix, version)
+
 	// Commit
-	// Standardizing to just the version string as per PLAN.md
-	// Alternatively could prefix with "v" depending on convention.
-	cmd = exec.Command("git", "commit", "-m", version)
+	cmd = exec.Command("git", "commit", "-m", versionString)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("git commit failed: %w", err)
 	}
 
 	// Tag
-	cmd = exec.Command("git", "tag", version)
+	cmd = exec.Command("git", "tag", versionString)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("git tag failed: %w", err)
 	}

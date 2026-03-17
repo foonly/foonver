@@ -6,7 +6,6 @@ import (
 	"os"
 	"reflect"
 
-	"foonly.dev/foonver/internal/git"
 	"github.com/adrg/xdg"
 	mapstructure "github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
@@ -59,10 +58,19 @@ func (l *Level) UnmarshalText(text []byte) error {
 	return nil
 }
 
+type GitInfo struct {
+	Ok        bool
+	Clean     bool
+	HasRemote bool
+	RootDir   string
+}
+
 type Config struct {
 	Push      bool   `mapstructure:"push"`
+	Prefix    string `mapstructure:"prefix"`
 	Verbosity Level  `mapstructure:"verbosity"`
 	Parser    string `mapstructure:"parser"`
+	Info      GitInfo
 }
 
 var Conf Config
@@ -72,9 +80,10 @@ func Init() {
 
 	viper.AddConfigPath("/etc/foonver")
 	viper.AddConfigPath(xdg.ConfigHome)
-	viper.AddConfigPath(git.Info.RootDir)
+	viper.AddConfigPath(Conf.Info.RootDir)
 
 	viper.SetDefault("push", false)
+	viper.SetDefault("prefix", "v")
 	viper.SetDefault("verbosity", "normal")
 	viper.SetDefault("parser", "all")
 

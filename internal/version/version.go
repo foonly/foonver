@@ -71,7 +71,7 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Successfully bumped version to %s\n", nextVersionStr)
 
 	if config.Conf.Push {
-		if !git.Info.HasRemote {
+		if !config.Conf.Info.HasRemote {
 			fmt.Fprintf(os.Stderr, "Cannot push: no git remote configured\n")
 			os.Exit(1)
 		}
@@ -88,7 +88,7 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 // the parsed version, and its raw content.
 func discoverVersion() (string, *semver.Version, []byte, error) {
 	for _, file := range versionFiles {
-		filePath := path.Join(git.Info.RootDir, file)
+		filePath := path.Join(config.Conf.Info.RootDir, file)
 		content, err := os.ReadFile(filePath)
 		if err != nil {
 			if os.IsNotExist(err) {
