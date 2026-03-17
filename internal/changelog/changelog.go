@@ -67,13 +67,23 @@ func GenerateMarkdown() (string, error) {
 			return "", err
 		}
 
+		// Filter out commits where the subject exactly matches the tag name.
+		var filtered []string
+		for _, c := range commits {
+			parts := strings.SplitN(c, " ", 2)
+			if len(parts) == 2 && parts[1] == tag {
+				continue
+			}
+			filtered = append(filtered, c)
+		}
+
 		b.WriteString("## " + tag + "\n\n")
-		if len(commits) == 0 {
+		if len(filtered) == 0 {
 			b.WriteString("- No changes\n\n")
 			continue
 		}
 
-		for _, c := range commits {
+		for _, c := range filtered {
 			b.WriteString("- " + c + "\n")
 		}
 		b.WriteString("\n")

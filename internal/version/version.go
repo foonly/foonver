@@ -27,6 +27,11 @@ var versionFiles = []string{
 }
 
 func RunVersion(cmd *cobra.Command, args []string) error {
+	if err := git.RunPreflightChecks(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
 	fileName, currentVersion, fileContent, err := discoverVersion()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

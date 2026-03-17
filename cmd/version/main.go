@@ -3,17 +3,11 @@
 package main
 
 import (
-	"fmt"
-
 	"foonly.dev/foonver/internal/commands"
 )
 
 var Version = "dev"
 
 func main() {
-
-	fmt.Printf("Version: %s\n\n", Version)
-
 	commands.Execute()
-
 }
