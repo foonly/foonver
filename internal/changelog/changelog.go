@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"foonly.dev/foonver/internal/config"
 	"foonly.dev/foonver/internal/git"
@@ -58,13 +59,17 @@ func GenerateMarkdown(nextVersion string) (string, error) {
 
 	// Include any unreleased changes since the last tag.
 	lastTag := tags[len(tags)-1]
-	title := nextVersion
-	if title == "" {
-		title = "Unreleased"
+	currentTime := time.Now()
+
+	title := "Unreleased"
+	dateNow := ""
+	if nextVersion != "" {
+		title = nextVersion
+		dateNow = currentTime.Format("2006-01-02")
 	}
 	unreleasedCommits, err := filteredCommits(fmt.Sprintf("%s..HEAD", lastTag.Name), title)
 	if err == nil && len(unreleasedCommits) > 0 {
-		group, err := generateGroup(fmt.Sprintf("%s..HEAD", lastTag.Name), title, "")
+		group, err := generateGroup(fmt.Sprintf("%s..HEAD", lastTag.Name), title, dateNow)
 		if err == nil {
 			b.WriteString(group)
 		}
