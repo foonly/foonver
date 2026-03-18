@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 
+	"foonly.dev/foonver/internal/changelog"
 	"foonly.dev/foonver/internal/config"
 	"foonly.dev/foonver/internal/git"
 	"github.com/Masterminds/semver/v3"
@@ -68,7 +69,19 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 		os.Exit(1)
 	}
 
-	if err := git.CommitAndTag(fileName, nextVersionStr); err != nil {
+	filesToCommit := []string{fileName}
+
+	if config.Conf.Changelog {
+		changelogFile, err := changelog.WriteChangelog(nextVersionStr)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error updating changelog: %v\n", err)
+			os.Exit(1)
+		}
+		filesToCommit = append(filesToCommit, changelogFile)
+		fmt.Printf("Updated changelog: %s\n", changelogFile)
+	}
+
+	if err := git.CommitAndTag(filesToCommit, nextVersionStr); err != nil {
 		fmt.Fprintf(os.Stderr, "Git error: %v\n", err)
 		os.Exit(1)
 	}

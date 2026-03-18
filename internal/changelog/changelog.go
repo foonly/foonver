@@ -2,10 +2,13 @@ package changelog
 
 import (
 	"fmt"
+	"os"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
 
+	"foonly.dev/foonver/internal/config"
 	"foonly.dev/foonver/internal/git"
 )
 
@@ -29,7 +32,8 @@ import (
 // Tags are discovered using creation date order and rendered newest-first.
 // Each tag section includes commits between previousTag..tag.
 // The first tag includes all commits reachable from that tag.
-func GenerateMarkdown() (string, error) {
+// If there are commits since the last tag, they are grouped under nextVersion (or "Unreleased" if empty).
+func GenerateMarkdown(nextVersion string) (string, error) {
 	tags, err := git.GetTags()
 	if err != nil {
 		return "", err
@@ -40,12 +44,30 @@ func GenerateMarkdown() (string, error) {
 
 	// No tags: fall back to full history.
 	if len(tags) == 0 {
-		group, err := generateGroup("", "Unreleased", "")
+		title := nextVersion
+		if title == "" {
+			title = "Unreleased"
+		}
+		group, err := generateGroup("", title, "")
 		if err != nil {
 			return "", err
 		}
 		b.WriteString(group)
 		return b.String(), nil
+	}
+
+	// Include any unreleased changes since the last tag.
+	lastTag := tags[len(tags)-1]
+	title := nextVersion
+	if title == "" {
+		title = "Unreleased"
+	}
+	unreleasedCommits, err := filteredCommits(fmt.Sprintf("%s..HEAD", lastTag.Name), title)
+	if err == nil && len(unreleasedCommits) > 0 {
+		group, err := generateGroup(fmt.Sprintf("%s..HEAD", lastTag.Name), title, "")
+		if err == nil {
+			b.WriteString(group)
+		}
 	}
 
 	// tags are oldest -> newest; render newest -> oldest
@@ -68,6 +90,21 @@ func GenerateMarkdown() (string, error) {
 	}
 
 	return b.String(), nil
+}
+
+// WriteChangelog generates the markdown and writes it to the configured file.
+func WriteChangelog(nextVersion string) (string, error) {
+	md, err := GenerateMarkdown(nextVersion)
+	if err != nil {
+		return "", err
+	}
+
+	filePath := path.Join(config.Conf.Info.RootDir, config.Conf.File)
+	if err := os.WriteFile(filePath, []byte(md), 0644); err != nil {
+		return "", fmt.Errorf("failed to write changelog to %s: %w", filePath, err)
+	}
+
+	return filePath, nil
 }
 
 func generateGroup(revRange string, name string, date string) (string, error) {

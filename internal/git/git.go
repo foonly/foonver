@@ -70,12 +70,16 @@ func RunPreflightChecks() error {
 	return nil
 }
 
-// CommitAndTag stages the version file, commits it with the version as the message, and creates a Git tag.
-func CommitAndTag(filename, version string) error {
-	// Add file
-	cmd := exec.Command("git", "add", filename)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("git add failed: %w", err)
+// CommitAndTag stages the version files, commits them with the version as the message, and creates a Git tag.
+func CommitAndTag(filenames []string, version string) error {
+	var cmd *exec.Cmd
+
+	// Add files
+	for _, filename := range filenames {
+		cmd = exec.Command("git", "add", filename)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("git add failed for %s: %w", filename, err)
+		}
 	}
 
 	// Append the prefix to version.

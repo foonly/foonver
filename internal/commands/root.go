@@ -8,11 +8,12 @@ import (
 )
 
 var (
-	flagQuiet   bool
-	flagVerbose bool
-	flagDebug   bool
-	flagPush    bool
-	flagNoPush  bool
+	flagQuiet     bool
+	flagVerbose   bool
+	flagDebug     bool
+	flagPush      bool
+	flagNoPush    bool
+	flagChangelog bool
 )
 
 var rootCmd = &cobra.Command{
@@ -36,12 +37,14 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&flagDebug, "debug", "d", false, "enable detailed debug output")
 	rootCmd.PersistentFlags().BoolVar(&flagPush, "push", false, "push new versions to the remote repository")
 	rootCmd.PersistentFlags().BoolVar(&flagNoPush, "no-push", false, "don't push new versions to the remote repository")
+	rootCmd.PersistentFlags().BoolVarP(&flagChangelog, "changelog", "c", false, "automatically update CHANGELOG.md")
 
 	rootCmd.MarkFlagsMutuallyExclusive("quiet", "normal", "verbose", "debug")
 	rootCmd.MarkFlagsMutuallyExclusive("push", "no-push")
 
 	viper.BindPFlag("push", rootCmd.PersistentFlags().Lookup("push"))
 	viper.BindPFlag("no-push", rootCmd.PersistentFlags().Lookup("no-push"))
+	viper.BindPFlag("changelog", rootCmd.PersistentFlags().Lookup("changelog"))
 	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
 	viper.BindPFlag("normal", rootCmd.PersistentFlags().Lookup("normal"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))

@@ -70,6 +70,8 @@ type Config struct {
 	Prefix    string `mapstructure:"prefix"`
 	Verbosity Level  `mapstructure:"verbosity"`
 	Parser    string `mapstructure:"parser"`
+	Changelog bool   `mapstructure:"changelog"`
+	File      string `mapstructure:"file"`
 	Info      GitInfo
 }
 
@@ -86,6 +88,8 @@ func Init() {
 	viper.SetDefault("prefix", "v")
 	viper.SetDefault("verbosity", "normal")
 	viper.SetDefault("parser", "all")
+	viper.SetDefault("changelog", false)
+	viper.SetDefault("file", "CHANGELOG.md")
 
 	// Find and read the config file
 	err := viper.ReadInConfig()
@@ -129,6 +133,10 @@ func processFlags() {
 	}
 	if viper.IsSet("no-push") && viper.GetBool("no-push") {
 		Conf.Push = false
+	}
+
+	if viper.IsSet("changelog") && viper.GetBool("changelog") {
+		Conf.Changelog = true
 	}
 
 	if viper.IsSet("quiet") && viper.GetBool("quiet") {
