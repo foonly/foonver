@@ -10,6 +10,7 @@
   - Enforces a clean working directory before proceeding.
   - Creates a dedicated version-bump commit.
   - Generates a Git tag corresponding to the new version.
+- **Changelog Management**: Categorizes commits and automatically updates `CHANGELOG.md` during the release process.
 - **Format Preservation**: Attempts to maintain the styling and formatting of JSON/TOML files during updates.
 
 ## Installation
@@ -53,6 +54,26 @@ foonver
 1. **Major**: If any commit message contains "breaking change".
 2. **Minor**: If any commit message starts with `feat:`, `feature`, or `new feature`.
 3. **Patch**: Default behavior for other changes (e.g., `fix:`, `docs:`, etc.).
+
+### Changelog Integration
+
+To automatically update your `CHANGELOG.md` file during a version bump, use the `--changelog` (or `-c`) flag:
+
+```bash
+foonver --changelog        # Auto-detect bump and update changelog
+foonver minor --changelog  # Manual minor bump and update changelog
+```
+
+The tool calculates the next version and uses it to group the current unreleased commits in the changelog. Both the version file and the changelog are then committed together in the release commit.
+
+### Generating Changelog Manually
+
+You can also preview the changelog based on your git history:
+
+```bash
+foonver changelog              # Print changelog to stdout
+foonver changelog --next v2.0.0 # Preview with a specific version header
+```
 
 ## Supported Version Files
 
