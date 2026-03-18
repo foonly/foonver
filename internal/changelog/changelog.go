@@ -1,10 +1,12 @@
 package changelog
 
 import (
-	"bytes"
 	"fmt"
-	"os/exec"
+	"regexp"
+	"sort"
 	"strings"
+
+	"foonly.dev/foonver/internal/git"
 )
 
 // GenerateMarkdown builds a changelog in Markdown from git tags and commits.
@@ -14,8 +16,12 @@ import (
 //	# Changelog
 //
 //	## v1.2.0
-//	- abc1234 Commit subject
-//	- def5678 Another commit
+//
+//	### Features
+//	- abc1234 feat: some feature
+//
+//	### Bug Fixes
+//	- def5678 fix: some bug
 //
 //	## v1.1.0
 //	- ...
@@ -24,7 +30,7 @@ import (
 // Each tag section includes commits between previousTag..tag.
 // The first tag includes all commits reachable from that tag.
 func GenerateMarkdown() (string, error) {
-	tags, err := getTags()
+	tags, err := git.GetTags()
 	if err != nil {
 		return "", err
 	}
@@ -34,18 +40,11 @@ func GenerateMarkdown() (string, error) {
 
 	// No tags: fall back to full history.
 	if len(tags) == 0 {
-		commits, err := getCommits("")
+		group, err := generateGroup("", "Unreleased", "")
 		if err != nil {
 			return "", err
 		}
-		b.WriteString("## Unreleased\n\n")
-		if len(commits) == 0 {
-			b.WriteString("- No commits found\n")
-		} else {
-			for _, c := range commits {
-				b.WriteString("- " + c + "\n")
-			}
-		}
+		b.WriteString(group)
 		return b.String(), nil
 	}
 
@@ -56,92 +55,154 @@ func GenerateMarkdown() (string, error) {
 		var revRange string
 		if i == 0 {
 			// First tag: include all commits up to this tag.
-			revRange = tag
+			revRange = tag.Name
 		} else {
 			prev := tags[i-1]
-			revRange = fmt.Sprintf("%s..%s", prev, tag)
+			revRange = fmt.Sprintf("%s..%s", prev.Name, tag.Name)
 		}
-
-		commits, err := getCommits(revRange)
+		group, err := generateGroup(revRange, tag.Name, tag.Date)
 		if err != nil {
 			return "", err
 		}
-
-		// Filter out commits where the subject exactly matches the tag name.
-		var filtered []string
-		for _, c := range commits {
-			parts := strings.SplitN(c, " ", 2)
-			if len(parts) == 2 && parts[1] == tag {
-				continue
-			}
-			filtered = append(filtered, c)
-		}
-
-		b.WriteString("## " + tag + "\n\n")
-		if len(filtered) == 0 {
-			b.WriteString("- No changes\n\n")
-			continue
-		}
-
-		for _, c := range filtered {
-			b.WriteString("- " + c + "\n")
-		}
-		b.WriteString("\n")
+		b.WriteString(group)
 	}
 
 	return b.String(), nil
 }
 
-func getTags() ([]string, error) {
-	out, err := runGit("tag", "--sort=creatordate")
+func generateGroup(revRange string, name string, date string) (string, error) {
+	commits, err := filteredCommits(revRange, name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list tags: %w", err)
+		return "", err
 	}
 
-	lines := splitNonEmptyLines(out)
-	return lines, nil
+	var b strings.Builder
+	title := name
+	lvl := "## "
+	if strings.HasSuffix(name, ".0") {
+		lvl = "# "
+	}
+
+	if date != "" {
+		title = fmt.Sprintf("%s (%s)", name, date)
+	}
+	b.WriteString(lvl + title + "\n\n")
+	if len(commits) > 0 {
+		renderGroupedCommits(&b, commits)
+	}
+	return b.String(), nil
 }
 
-func getCommits(revRange string) ([]string, error) {
-	args := []string{"log", "--pretty=format:%h %s"}
-	if strings.TrimSpace(revRange) != "" {
-		args = append(args, revRange)
-	}
+var findVer = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`)
+var typeRegex = regexp.MustCompile(`(?i)^([a-z]+)(?:\((.*)\))?(!)?:\s*(.*)$`)
 
-	out, err := runGit(args...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get commits for range %q: %w", revRange, err)
-	}
-
-	return splitNonEmptyLines(out), nil
+var typeTitles = map[string]string{
+	"feat":     "Features",
+	"fix":      "Bug Fixes",
+	"revert":   "Reverts",
+	"chore":    "Maintenance",
+	"docs":     "Documentation",
+	"style":    "Styles",
+	"refactor": "Refactor",
+	"perf":     "Performance Improvements",
+	"test":     "Tests",
+	"build":    "Build System",
+	"ci":       "Continuous Integration",
 }
 
-func runGit(args ...string) (string, error) {
-	cmd := exec.Command("git", args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+func renderGroupedCommits(b *strings.Builder, commits []string) {
+	groups := make(map[string][]string)
+	for _, c := range commits {
+		parts := strings.SplitN(c, " ", 2)
+		hash := parts[0]
+		matches := typeRegex.FindStringSubmatch(parts[1])
+		if len(matches) > 1 {
+			scp := ""
+			tpe := strings.ToLower(matches[1])
+			msg := matches[4]
+			if matches[2] != "" {
+				scp = fmt.Sprintf("%s: ", matches[2])
+			}
+			if matches[3] == "!" {
+				msg += " (BREAKING CHANGE)"
+			}
 
-	if err := cmd.Run(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		if msg == "" {
-			msg = err.Error()
+			groups[tpe] = append(groups[tpe], fmt.Sprintf("%s%s (%s)", scp, msg, hash))
+		} else {
+			groups["misc"] = append(groups["misc"], fmt.Sprintf("%s (%s)", parts[1], hash))
 		}
-		return "", fmt.Errorf("git %s: %s", strings.Join(args, " "), msg)
 	}
 
-	return stdout.String(), nil
+	// Preferred order for common types
+	order := []string{"feat", "fix", "revert", "perf", "refactor", "docs", "style", "test", "build", "ci", "chore"}
+	seen := make(map[string]bool)
+
+	for _, t := range order {
+		if items, ok := groups[t]; ok {
+			title := typeTitles[t]
+			b.WriteString("### " + title + "\n")
+			for _, item := range items {
+				b.WriteString("- " + item + "\n")
+			}
+			b.WriteString("\n")
+			seen[t] = true
+		}
+	}
+
+	// Any other types discovered
+	var remaining []string
+	for t := range groups {
+		if !seen[t] && t != "misc" {
+			remaining = append(remaining, t)
+		}
+	}
+	sort.Strings(remaining)
+	for _, t := range remaining {
+		title := strings.ToUpper(t[:1]) + t[1:]
+		b.WriteString("### " + title + "\n")
+		for _, item := range groups[t] {
+			b.WriteString("- " + item + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	// Misc last
+	if items, ok := groups["misc"]; ok {
+		b.WriteString("### Misc\n")
+		for _, item := range items {
+			b.WriteString("- " + item + "\n")
+		}
+		b.WriteString("\n")
+	}
 }
 
-func splitNonEmptyLines(s string) []string {
-	raw := strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
-	out := make([]string, 0, len(raw))
-	for _, line := range raw {
-		line = strings.TrimSpace(line)
-		if line == "" {
+func filteredCommits(revRange string, tag string) ([]string, error) {
+	commits, err := git.GetCommits(revRange)
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []string
+	for _, c := range commits {
+		parts := strings.SplitN(c, " ", 2)
+		if len(parts) < 2 {
 			continue
 		}
-		out = append(out, line)
+		msg := strings.TrimSpace(parts[1])
+
+		if msg == tag {
+			continue
+		}
+
+		if strings.HasPrefix(msg, "Merge ") {
+			continue
+		}
+
+		if findVer.MatchString(msg) {
+			continue
+		}
+
+		filtered = append(filtered, c)
 	}
-	return out
+	return filtered, nil
 }

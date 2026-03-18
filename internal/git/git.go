@@ -10,6 +10,23 @@ import (
 	"foonly.dev/foonver/internal/config"
 )
 
+func runGit(args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg == "" {
+			msg = err.Error()
+		}
+		return "", fmt.Errorf("git %s: %s", strings.Join(args, " "), msg)
+	}
+
+	return stdout.String(), nil
+}
+
 // RunPreflightChecks ensures the current directory is a Git repository and has no uncommitted changes.
 func RunPreflightChecks() error {
 	config.Conf.Info = config.GitInfo{
@@ -89,4 +106,56 @@ func PushTags() error {
 		return fmt.Errorf("Failed to push tags: %v\n", err)
 	}
 	return nil
+}
+
+type Tag struct {
+	Name string
+	Date string
+}
+
+func GetTags() ([]Tag, error) {
+	out, err := runGit("for-each-ref", "--format=%(refname:short) %(creatordate:short)", "refs/tags", "--sort=creatordate")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tags: %w", err)
+	}
+
+	lines := splitNonEmptyLines(out)
+	tags := make([]Tag, 0, len(lines))
+	for _, line := range lines {
+		parts := strings.Fields(line)
+		if len(parts) >= 2 {
+			tags = append(tags, Tag{
+				Name: parts[0],
+				Date: parts[1],
+			})
+		}
+	}
+	return tags, nil
+}
+
+func GetCommits(revRange string) ([]string, error) {
+	args := []string{"log", "--pretty=format:%h %s"}
+	if strings.TrimSpace(revRange) != "" {
+		args = append(args, revRange)
+	}
+
+	out, err := runGit(args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commits for range %q: %w", revRange, err)
+	}
+
+	return splitNonEmptyLines(out), nil
+}
+
+func splitNonEmptyLines(s string) []string {
+	raw := strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
+	out := make([]string, 0, len(raw))
+	for _, line := range raw {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		out = append(out, line)
+	}
+	return out
 }
