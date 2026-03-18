@@ -11,6 +11,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+var AppVersion = "dev"
+
 // Level represents the verbosity level of the application.
 type Level int
 

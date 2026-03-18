@@ -6,8 +6,6 @@ import (
 	"foonly.dev/foonver/internal/commands"
 )
 
-var Version = "dev"
-
 func main() {
 	commands.Execute()
 }

@@ -1,7 +1,7 @@
 .PHONY: build dev prepare install clean test format
 
 # Go build flags
-LDFLAGS := -s -w -X main.Version=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+LDFLAGS := -s -w -X foonly.dev/foonver/internal/config.AppVersion=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 build: clean prepare bin/foonver
 
