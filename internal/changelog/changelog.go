@@ -120,9 +120,9 @@ func generateGroup(revRange string, name string, date string) (string, error) {
 
 	var b strings.Builder
 	title := name
-	lvl := "## "
+	lvl := "### "
 	if strings.HasSuffix(name, ".0") {
-		lvl = "# "
+		lvl = "## "
 	}
 
 	if date != "" {
@@ -182,7 +182,7 @@ func renderGroupedCommits(b *strings.Builder, commits []string) {
 	for _, t := range order {
 		if items, ok := groups[t]; ok {
 			title := typeTitles[t]
-			b.WriteString("### " + title + "\n")
+			b.WriteString("#### " + title + "\n")
 			for _, item := range items {
 				b.WriteString("- " + item + "\n")
 			}
