@@ -41,12 +41,17 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Found version %s in %s\n", currentVersion.Original(), fileName)
 
-	newVersion := "auto"
+	newVersion := ""
 	if len(args) > 0 {
 		newVersion = args[0]
 	}
 
-	nextVersion, err := determineNextVersion(currentVersion, cmd.Name(), newVersion)
+	action := cmd.Name()
+	if cmd.Parent() == nil {
+		action = "auto"
+	}
+
+	nextVersion, err := determineNextVersion(currentVersion, action, newVersion)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error determining next version: %v\n", err)
 		os.Exit(1)
@@ -182,7 +187,9 @@ func determineNextVersion(current *semver.Version, target string, setVersion str
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("Auto-detected version bump: %s\n", auto)
+		if auto != "" {
+			fmt.Printf("Auto-detected version bump: %s\n", auto)
+		}
 		action = auto
 	}
 
