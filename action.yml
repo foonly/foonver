@@ -1,0 +1,46 @@
+# action.yml
+name: "Run foonver"
+description: "Automate SemVer bumping using pre-compiled foonver binary"
+inputs:
+  version:
+    description: "Version of foonver to use (e.g., v0.6.0)"
+    required: false
+    default: "latest"
+  changelog:
+    description: "Whether to update CHANGELOG.md"
+    required: false
+    default: "true"
+  args:
+    description: "Additional arguments for foonver"
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Download foonver
+      shell: bash
+      run: |
+        VERSION="${{ inputs.version }}"
+        if [ "$VERSION" = "latest" ]; then
+          URL="https://github.com/foonly/foonver/releases/latest/download/foonver"
+        else
+          URL="https://github.com/foonly/foonver/releases/download/${VERSION}/foonver"
+        fi
+
+        echo "Downloading foonver from $URL"
+        curl -sSL -o /usr/local/bin/foonver "$URL"
+        chmod +x /usr/local/bin/foonver
+
+    - name: Run foonver
+      shell: bash
+      run: |
+        ARGS="${{ inputs.args }}"
+        if [ "${{ inputs.changelog }}" == "true" ]; then
+          ARGS="--changelog $ARGS"
+        fi
+
+        # Ensure git is configured for the commit/tag foonver will create
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+        foonver $ARGS
