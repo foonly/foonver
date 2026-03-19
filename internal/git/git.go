@@ -41,7 +41,7 @@ func RunPreflightChecks() error {
 	output, err := cmd.Output()
 	if err != nil {
 		config.Conf.Info.Ok = false
-		return fmt.Errorf("not inside a Git repository")
+		return fmt.Errorf("Not inside a Git repository")
 	}
 	config.Conf.Info.RootDir = strings.TrimSpace(string(output))
 
@@ -50,7 +50,7 @@ func RunPreflightChecks() error {
 	output, err = cmd.Output()
 	if err != nil {
 		config.Conf.Info.Ok = false
-		return fmt.Errorf("failed to check git remotes: %w", err)
+		return fmt.Errorf("Failed to check git remotes: %w", err)
 	}
 	if len(bytes.TrimSpace(output)) > 0 {
 		config.Conf.Info.HasRemote = true
@@ -61,11 +61,11 @@ func RunPreflightChecks() error {
 	output, err = cmd.Output()
 	if err != nil {
 		config.Conf.Info.Ok = false
-		return fmt.Errorf("failed to check git status: %w", err)
+		return fmt.Errorf("Failed to check git status: %w", err)
 	}
 	if len(bytes.TrimSpace(output)) > 0 {
 		config.Conf.Info.Clean = false
-		return fmt.Errorf("git working directory not clean. Commit or stash changes first")
+		return fmt.Errorf("Git working directory not clean. Commit or stash changes first")
 	}
 	return nil
 }

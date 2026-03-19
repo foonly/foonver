@@ -29,7 +29,7 @@ var versionFiles = []string{
 
 func RunVersion(cmd *cobra.Command, args []string) error {
 	if err := git.RunPreflightChecks(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
@@ -171,7 +171,7 @@ func extractVersion(filename string, content []byte) (string, error) {
 // determineNextVersion calculates the next version based on a target ("major", "minor", "patch",
 // or a specific version string) or automatically by analyzing Git commit messages.
 func determineNextVersion(current *semver.Version, target string, setVersion string) (*semver.Version, error) {
-	action := strings.ToLower(target)
+	action := strings.TrimSpace(strings.ToLower(target))
 
 	if action == "ver" {
 		return semver.NewVersion(setVersion)
