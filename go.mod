@@ -1,4 +1,4 @@
-module foonly.dev/foonver
+module github.com/foonly/foonver
 
 go 1.25.0
 

@@ -3,7 +3,7 @@
 package main
 
 import (
-	"foonly.dev/foonver/internal/commands"
+	"github.com/foonly/foonver/internal/commands"
 )
 
 func main() {

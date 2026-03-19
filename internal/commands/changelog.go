@@ -3,7 +3,7 @@ package commands
 import (
 	"fmt"
 
-	"foonly.dev/foonver/internal/changelog"
+	"github.com/foonly/foonver/internal/changelog"
 	"github.com/spf13/cobra"
 )
 

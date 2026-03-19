@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"foonly.dev/foonver/internal/config"
+	"github.com/foonly/foonver/internal/config"
 )
 
 func runGit(args ...string) (string, error) {

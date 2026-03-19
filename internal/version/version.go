@@ -12,10 +12,10 @@ import (
 	"regexp"
 	"strings"
 
-	"foonly.dev/foonver/internal/changelog"
-	"foonly.dev/foonver/internal/config"
-	"foonly.dev/foonver/internal/git"
 	"github.com/Masterminds/semver/v3"
+	"github.com/foonly/foonver/internal/changelog"
+	"github.com/foonly/foonver/internal/config"
+	"github.com/foonly/foonver/internal/git"
 	"github.com/spf13/cobra"
 )
 

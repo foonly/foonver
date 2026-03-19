@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"foonly.dev/foonver/internal/config"
-	"foonly.dev/foonver/internal/git"
+	"github.com/foonly/foonver/internal/config"
+	"github.com/foonly/foonver/internal/git"
 )
 
 // GenerateMarkdown builds a changelog in Markdown from git tags and commits.

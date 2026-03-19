@@ -3,8 +3,8 @@ package commands
 import (
 	"fmt"
 
-	"foonly.dev/foonver/internal/version"
 	"github.com/Masterminds/semver/v3"
+	"github.com/foonly/foonver/internal/version"
 	"github.com/spf13/cobra"
 )
 

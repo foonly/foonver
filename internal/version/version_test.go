@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"foonly.dev/foonver/internal/config"
 	"github.com/Masterminds/semver/v3"
+	"github.com/foonly/foonver/internal/config"
 )
 
 func TestExtractVersion(t *testing.T) {

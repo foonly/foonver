@@ -1,8 +1,8 @@
 package commands
 
 import (
-	"foonly.dev/foonver/internal/config"
-	"foonly.dev/foonver/internal/version"
+	"github.com/foonly/foonver/internal/config"
+	"github.com/foonly/foonver/internal/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
