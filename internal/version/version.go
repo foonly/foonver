@@ -177,7 +177,7 @@ func determineNextVersion(current *semver.Version, target string, setVersion str
 		return semver.NewVersion(setVersion)
 	}
 
-	if action == "auto" {
+	if action == "auto" || action == "" {
 		auto, err := autoVersion()
 		if err != nil {
 			return nil, err
