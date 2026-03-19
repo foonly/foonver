@@ -182,6 +182,7 @@ func determineNextVersion(current *semver.Version, target string, setVersion str
 		if err != nil {
 			return nil, err
 		}
+		fmt.Printf("Auto-detected version bump: %s\n", auto)
 		action = auto
 	}
 
@@ -197,7 +198,6 @@ func determineNextVersion(current *semver.Version, target string, setVersion str
 		next = *current
 	}
 	return &next, nil
-
 }
 
 func autoVersion() (string, error) {
