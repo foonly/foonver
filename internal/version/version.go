@@ -41,7 +41,7 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Found version %s in %s\n", currentVersion.Original(), fileName)
 
-	newVersion := ""
+	newVersion := "auto"
 	if len(args) > 0 {
 		newVersion = args[0]
 	}
@@ -177,7 +177,7 @@ func determineNextVersion(current *semver.Version, target string, setVersion str
 		return semver.NewVersion(setVersion)
 	}
 
-	if action == "auto" || action == "" {
+	if action == "auto" {
 		auto, err := autoVersion()
 		if err != nil {
 			return nil, err
