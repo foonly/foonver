@@ -1,6 +1,20 @@
 # Changelog
 
-## 0.6.0 (2026-03-18)
+## 0.7.0 (2026-03-19)
+
+#### Features
+- version: Default to auto versioning when no version is specified (786f3cd)
+- action: Add composite action for foonver (df58257)
+
+#### Bug Fixes
+- git: Standardize error message casing (a4ba453)
+- version: Log auto-detected version bump (9169e7b)
+- version: Allow empty action for auto versioning (ba992a6)
+
+#### Build System
+- Update module path and rename command (9660f4c)
+
+## v0.6.0 (2026-03-18)
 
 #### Features
 - commands: add config command to display current settings (d0a90d0)
