@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.7.0 (2026-03-19)
+### 0.7.1 (2026-03-19)
+
+#### Bug Fixes
+- version: Handle auto-detected version bumps correctly (b1b78b7)
+
+## v0.7.0 (2026-03-19)
 
 #### Features
 - version: Default to auto versioning when no version is specified (786f3cd)
