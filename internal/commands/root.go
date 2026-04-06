@@ -2,7 +2,6 @@ package commands
 
 import (
 	"github.com/foonly/foonver/internal/config"
-	"github.com/foonly/foonver/internal/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -24,7 +23,6 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		config.Init()
 	},
-	RunE: version.RunVersion,
 }
 
 func Execute() error {
