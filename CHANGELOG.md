@@ -1,6 +1,23 @@
 # Changelog
 
-### 0.7.1 (2026-03-19)
+## 0.8.0 (2026-04-06)
+
+#### Features
+- cmd: Ensure repository exists before execution (dea8423)
+- versioning: Add foonver.toml configuration (d9a6428)
+- root: Removed "auto" as default. (4fb63e9)
+- version: add dry-run flag and execution plan (da333c0)
+
+#### Bug Fixes
+- version: Ignore unused return value in test (786c036)
+
+#### Documentation
+- Update README with new usage details and configuration (1bacdbc)
+
+#### Maintenance
+- Add PLAN.md to .gitignore (ecb736f)
+
+### v0.7.1 (2026-03-19)
 
 #### Bug Fixes
 - version: Handle auto-detected version bumps correctly (b1b78b7)
