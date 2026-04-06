@@ -2,12 +2,14 @@ package commands
 
 import (
 	"github.com/foonly/foonver/internal/config"
+	"github.com/foonly/foonver/internal/git"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
 	flagQuiet     bool
+	flagNormal    bool
 	flagVerbose   bool
 	flagDebug     bool
 	flagPush      bool
@@ -21,6 +23,7 @@ var rootCmd = &cobra.Command{
 	Short: "Version Management Utility",
 	Long:  "foonver is a lightweight CLI utility for automated Semantic Versioning (SemVer) management.",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		_ = git.EnsureRepo()
 		config.Init()
 	},
 }
@@ -31,7 +34,7 @@ func Execute() error {
 
 func init() {
 	rootCmd.PersistentFlags().BoolVarP(&flagQuiet, "quiet", "q", false, "suppress all non-essential output")
-	rootCmd.PersistentFlags().BoolVarP(&flagVerbose, "normal", "n", false, "set normal informational output")
+	rootCmd.PersistentFlags().BoolVarP(&flagNormal, "normal", "n", false, "set normal informational output")
 	rootCmd.PersistentFlags().BoolVarP(&flagVerbose, "verbose", "v", false, "enable additional informational output")
 	rootCmd.PersistentFlags().BoolVarP(&flagDebug, "debug", "d", false, "enable detailed debug output")
 	rootCmd.PersistentFlags().BoolVar(&flagPush, "push", false, "push new versions to the remote repository")
