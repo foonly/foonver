@@ -137,7 +137,7 @@ func TestDetermineNextVersionTarget(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := determineNextVersion(current, tt.cmd, tt.arg)
+			got, _, _, err := determineNextVersion(current, tt.cmd, tt.arg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("determineNextVersion() error = %v, wantErr %v", err, tt.wantErr)
 				return
