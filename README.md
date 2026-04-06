@@ -4,14 +4,14 @@
 
 ## Features
 
+- **Plan-First Workflow**: Preview exactly what will happen before any files are changed.
 - **Automated Versioning**: Intelligently determines the next version by analyzing Git commit history since the last tag.
 - **Multi-format Support**: Discovers and updates version strings in `package.json`, `version.json`, `version.toml`, `version.txt`, and `version.md`.
 - **Git Integration**:
-  - Enforces a clean working directory before proceeding.
-  - Creates a dedicated version-bump commit.
-  - Generates a Git tag corresponding to the new version.
-- **Changelog Management**: Categorizes commits and automatically updates `CHANGELOG.md` during the release process.
-- **Format Preservation**: Attempts to maintain the styling and formatting of JSON/TOML files during updates.
+  - Validates repository state before mutating.
+  - Creates dedicated version-bump commits and tags.
+  - Optional automatic pushing of tags and commits.
+- **Changelog Management**: Categorizes commits and automatically updates `CHANGELOG.md`.
 
 ## Installation
 
@@ -22,13 +22,27 @@ Ensure you have [Go](https://go.dev/) (1.25.0 or later) installed.
 git clone https://github.com/foonly-dev/foonver.git
 cd foonver
 
-# Build and install to ~/.local/bin/
+# Build and install
 make install
 ```
 
 ## Usage
 
-Run `foonver` from the root of a Git repository containing one of the supported version files.
+Foonver requires a subcommand to perform a version bump.
+
+### Automatic Bumping (Recommended)
+
+The `auto` command analyzes all commit messages since the last version tag to calculate the next bump:
+
+```bash
+foonver auto
+```
+
+**Automatic Logic:**
+
+1. **Major**: Triggered if any commit contains `BREAKING CHANGE:` or uses the `!` suffix (e.g., `feat!:`).
+2. **Minor**: Triggered if any commit starts with `feat:`.
+3. **Patch**: Default behavior for other changes (e.g., `fix:`, `docs:`, `chore:`).
 
 ### Manual Bumping
 
@@ -38,46 +52,50 @@ Explicitly specify the bump type or a target version:
 foonver major   # 1.0.0 -> 2.0.0
 foonver minor   # 1.0.0 -> 1.1.0
 foonver patch   # 1.0.0 -> 1.0.1
-foonver 1.2.3   # Set version specifically to 1.2.3
+foonver ver 1.2.3  # Set version specifically to 1.2.3
 ```
 
-### Automatic Bumping (Recommended)
+### Dry Run
 
-When run without arguments, `foonver` analyzes commit messages since the last tag to decide the increment:
+Use the `--dry-run` flag to see the calculated version and the list of commits being considered without making any changes to your files or Git state. This works even on dirty repositories.
 
 ```bash
-foonver
+foonver auto --dry-run
 ```
 
-**Automatic Logic:**
+## Configuration
 
-1. **Major**: If any commit message contains "breaking change".
-2. **Minor**: If any commit message starts with `feat:`, `feature`, or `new feature`.
-3. **Patch**: Default behavior for other changes (e.g., `fix:`, `docs:`, etc.).
+Foonver looks for a `foonver.toml`, `foonver.yaml`, or `foonver.json` file in the following locations (in order):
 
-### Changelog Integration
+1. The project root directory.
+2. The XDG configuration home (usually `~/.config/foonver/`).
+3. `/etc/foonver/`.
 
-To automatically update your `CHANGELOG.md` file during a version bump, use the `--changelog` (or `-c`) flag:
+### Example Configuration (`foonver.toml`)
 
-```bash
-foonver --changelog        # Auto-detect bump and update changelog
-foonver minor --changelog  # Manual minor bump and update changelog
-```
+```toml
+# Automatically push commits and tags to remote
+push = false
 
-The tool calculates the next version and uses it to group the current unreleased commits in the changelog. Both the version file and the changelog are then committed together in the release commit.
+# Prefix for git tags (e.g., v1.0.0)
+prefix = "v"
 
-### Generating Changelog Manually
+# Output verbosity: quiet, normal, verbose, debug
+verbosity = "normal"
 
-You can also preview the changelog based on your git history:
+# Commit parser: angular, generic, or all
+parser = "all"
 
-```bash
-foonver changelog              # Print changelog to stdout
-foonver changelog --next v2.0.0 # Preview with a specific version header
+# Automatically update the changelog file
+changelog = true
+
+# The name of the changelog file
+file = "CHANGELOG.md"
 ```
 
 ## Supported Version Files
 
-The tool scans the project root for files in this order of precedence:
+The tool scans the project root for files in this order:
 
 1. `package.json`
 2. `version.json`
@@ -89,7 +107,7 @@ The tool scans the project root for files in this order of precedence:
 
 The project includes a `Makefile` for standard development tasks:
 
-- `make build`: Compiles the binary to `bin/version`.
+- `make build`: Compiles the binary to `bin/foonver`.
 - `make test`: Runs the test suite.
 - `make format`: Formats Go source code.
 - `make clean`: Removes build artifacts.
