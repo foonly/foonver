@@ -10,7 +10,7 @@ import (
 
 var autoCommand = &cobra.Command{
 	Use:   "auto",
-	Short: "Determine the version by git commits (default)",
+	Short: "Determine the version by git commits",
 	RunE:  version.RunVersion,
 }
 
