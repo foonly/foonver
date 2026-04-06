@@ -1,4 +1,4 @@
-// Package git provides helper functions for Git operations like preflight checks and committing version changes.
+// Package git provides helper functions for Git operations like repository validation, status checks, and versioning.
 package git
 
 import (
@@ -27,8 +27,8 @@ func runGit(args ...string) (string, error) {
 	return stdout.String(), nil
 }
 
-// RunPreflightChecks ensures the current directory is a Git repository and has no uncommitted changes.
-func RunPreflightChecks() error {
+// EnsureRepo checks if the current directory is a Git repository and populates config.Conf.Info.
+func EnsureRepo() error {
 	config.Conf.Info = config.GitInfo{
 		Ok:        true,
 		Clean:     true,
@@ -41,7 +41,7 @@ func RunPreflightChecks() error {
 	output, err := cmd.Output()
 	if err != nil {
 		config.Conf.Info.Ok = false
-		return fmt.Errorf("Not inside a Git repository")
+		return fmt.Errorf("not inside a Git repository")
 	}
 	config.Conf.Info.RootDir = strings.TrimSpace(string(output))
 
@@ -49,22 +49,32 @@ func RunPreflightChecks() error {
 	cmd = exec.Command("git", "remote")
 	output, err = cmd.Output()
 	if err != nil {
-		config.Conf.Info.Ok = false
-		return fmt.Errorf("Failed to check git remotes: %w", err)
+		return fmt.Errorf("failed to check git remotes: %w", err)
 	}
 	if len(bytes.TrimSpace(output)) > 0 {
 		config.Conf.Info.HasRemote = true
 	}
 
-	// Check for clean working directory
-	cmd = exec.Command("git", "status", "--porcelain")
-	output, err = cmd.Output()
+	return nil
+}
+
+// IsClean checks for uncommitted changes in the working directory and updates config.Conf.Info.
+func IsClean() bool {
+	cmd := exec.Command("git", "status", "--porcelain")
+	output, err := cmd.Output()
 	if err != nil {
-		config.Conf.Info.Ok = false
-		return fmt.Errorf("Failed to check git status: %w", err)
+		return false
 	}
-	if len(bytes.TrimSpace(output)) > 0 {
-		config.Conf.Info.Clean = false
+	config.Conf.Info.Clean = len(bytes.TrimSpace(output)) == 0
+	return config.Conf.Info.Clean
+}
+
+// RunPreflightChecks ensures the current directory is a Git repository and has no uncommitted changes.
+func RunPreflightChecks() error {
+	if err := EnsureRepo(); err != nil {
+		return err
+	}
+	if !IsClean() {
 		return fmt.Errorf("Git working directory not clean. Commit or stash changes first")
 	}
 	return nil
@@ -100,6 +110,7 @@ func CommitAndTag(filenames []string, version string) error {
 	return nil
 }
 
+// PushTags pushes local commits and tags to the remote repository.
 func PushTags() error {
 	cmd := exec.Command("git", "push")
 	if err := cmd.Run(); err != nil {
@@ -117,6 +128,7 @@ type Tag struct {
 	Date string
 }
 
+// GetTags returns all tags in the repository sorted by creation date.
 func GetTags() ([]Tag, error) {
 	out, err := runGit("for-each-ref", "--format=%(refname:short) %(creatordate:short)", "refs/tags", "--sort=creatordate")
 	if err != nil {
@@ -137,6 +149,16 @@ func GetTags() ([]Tag, error) {
 	return tags, nil
 }
 
+// GetLatestTag returns the most recent tag name.
+func GetLatestTag() (string, error) {
+	out, err := runGit("describe", "--tags", "--abbrev=0")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+// GetCommits returns a list of commit hashes and messages for the given range.
 func GetCommits(revRange string) ([]string, error) {
 	args := []string{"log", "--pretty=format:%h %s"}
 	if strings.TrimSpace(revRange) != "" {

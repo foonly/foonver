@@ -19,6 +19,32 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type StepType string
+
+const (
+	StepUpdateVersionFile StepType = "UpdateVersionFile"
+	StepUpdateChangelog   StepType = "UpdateChangelog"
+	StepGitCommit         StepType = "GitCommit"
+	StepGitTag            StepType = "GitTag"
+	StepGitPush           StepType = "GitPush"
+)
+
+type PlanStep struct {
+	Type        StepType
+	Description string
+	Action      func() error
+}
+
+type ExecutionPlan struct {
+	CurrentVersion *semver.Version
+	NextVersion    *semver.Version
+	VersionFile    string
+	Commits        []string
+	LastTag        string
+	IsDirty        bool
+	Steps          []PlanStep
+}
+
 var versionFiles = []string{
 	"package.json",
 	"version.json",
@@ -28,18 +54,73 @@ var versionFiles = []string{
 }
 
 func RunVersion(cmd *cobra.Command, args []string) error {
-	if err := git.RunPreflightChecks(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-
-	fileName, currentVersion, fileContent, err := discoverVersion()
+	plan, err := BuildPlan(cmd, args)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Found version %s in %s\n", currentVersion.Original(), fileName)
+	fmt.Printf("Found version %s in %s\n", plan.CurrentVersion.Original(), plan.VersionFile)
+	if plan.LastTag != "" {
+		fmt.Printf("Last version tag: %s\n", plan.LastTag)
+	}
+
+	if len(plan.Commits) > 0 {
+		fmt.Println("Commits since last tag:")
+		for _, c := range plan.Commits {
+			fmt.Printf("  %s\n", c)
+		}
+	}
+
+	nextVersionStr := plan.NextVersion.String()
+	if strings.HasPrefix(plan.CurrentVersion.Original(), "v") {
+		nextVersionStr = "v" + nextVersionStr
+	}
+
+	if plan.CurrentVersion.String() == plan.NextVersion.String() {
+		fmt.Println("Version is already up to date.")
+		return nil
+	}
+
+	fmt.Printf("Next version: %s\n", nextVersionStr)
+
+	if config.Conf.DryRun {
+		fmt.Println("\nMode: dry-run (no changes will be made)")
+		fmt.Printf("Repo clean: %t\n", !plan.IsDirty)
+		fmt.Println("Planned actions:")
+		for _, step := range plan.Steps {
+			fmt.Printf("  - %s\n", step.Description)
+		}
+		return nil
+	}
+
+	if plan.IsDirty {
+		fmt.Fprintf(os.Stderr, "Error: Git working directory not clean. Commit or stash changes first.\n")
+		os.Exit(1)
+	}
+
+	for _, step := range plan.Steps {
+		if config.Conf.Verbosity >= config.Normal {
+			fmt.Printf("Executing: %s...\n", step.Description)
+		}
+		if err := step.Action(); err != nil {
+			return fmt.Errorf("step %s failed: %w", step.Type, err)
+		}
+	}
+
+	fmt.Printf("Successfully bumped version to %s\n", nextVersionStr)
+	return nil
+}
+
+func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
+	if err := git.EnsureRepo(); err != nil {
+		return nil, err
+	}
+
+	fileName, currentVersion, fileContent, err := discoverVersion()
+	if err != nil {
+		return nil, err
+	}
 
 	newVersion := ""
 	if len(args) > 0 {
@@ -51,10 +132,23 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 		action = "auto"
 	}
 
-	nextVersion, err := determineNextVersion(currentVersion, action, newVersion)
+	nextVersion, commits, lastTag, err := determineNextVersion(currentVersion, action, newVersion)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error determining next version: %v\n", err)
-		os.Exit(1)
+		return nil, err
+	}
+
+	plan := &ExecutionPlan{
+		CurrentVersion: currentVersion,
+		NextVersion:    nextVersion,
+		VersionFile:    fileName,
+		Commits:        commits,
+		LastTag:        lastTag,
+		IsDirty:        !git.IsClean(),
+		Steps:          []PlanStep{},
+	}
+
+	if currentVersion.String() == nextVersion.String() {
+		return plan, nil
 	}
 
 	nextVersionStr := nextVersion.String()
@@ -62,49 +156,55 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 		nextVersionStr = "v" + nextVersionStr
 	}
 
-	if currentVersion.String() == nextVersion.String() {
-		fmt.Println("Version is already up to date.")
-		os.Exit(0)
-	}
+	// 1. Update version file
+	plan.Steps = append(plan.Steps, PlanStep{
+		Type:        StepUpdateVersionFile,
+		Description: fmt.Sprintf("Update %s: %s -> %s", fileName, currentVersion.Original(), nextVersionStr),
+		Action: func() error {
+			return updateVersionFile(fileName, currentVersion.Original(), nextVersionStr, fileContent)
+		},
+	})
 
-	fmt.Printf("Bumping version from %s to %s\n", currentVersion.Original(), nextVersionStr)
-
-	if err := updateVersionFile(fileName, currentVersion.Original(), nextVersionStr, fileContent); err != nil {
-		fmt.Fprintf(os.Stderr, "Error updating version file: %v\n", err)
-		os.Exit(1)
-	}
-
-	filesToCommit := []string{fileName}
-
+	// 2. Changelog
 	if config.Conf.Changelog {
-		changelogFile, err := changelog.WriteChangelog(nextVersionStr)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error updating changelog: %v\n", err)
-			os.Exit(1)
-		}
-		filesToCommit = append(filesToCommit, changelogFile)
-		fmt.Printf("Updated changelog: %s\n", changelogFile)
+		plan.Steps = append(plan.Steps, PlanStep{
+			Type:        StepUpdateChangelog,
+			Description: fmt.Sprintf("Update changelog: %s", config.Conf.File),
+			Action: func() error {
+				_, err := changelog.WriteChangelog(nextVersionStr)
+				return err
+			},
+		})
 	}
 
-	if err := git.CommitAndTag(filesToCommit, nextVersionStr); err != nil {
-		fmt.Fprintf(os.Stderr, "Git error: %v\n", err)
-		os.Exit(1)
-	}
+	// 3. Commit and Tag
+	plan.Steps = append(plan.Steps, PlanStep{
+		Type:        StepGitCommit,
+		Description: fmt.Sprintf("Git commit and tag: %s", nextVersionStr),
+		Action: func() error {
+			files := []string{fileName}
+			if config.Conf.Changelog {
+				changelogPath := path.Join(config.Conf.Info.RootDir, config.Conf.File)
+				files = append(files, changelogPath)
+			}
+			return git.CommitAndTag(files, nextVersionStr)
+		},
+	})
 
-	fmt.Printf("Successfully bumped version to %s\n", nextVersionStr)
-
+	// 4. Push
 	if config.Conf.Push {
-		if !config.Conf.Info.HasRemote {
-			fmt.Fprintf(os.Stderr, "Cannot push: no git remote configured\n")
-			os.Exit(1)
-		}
-		if err := git.PushTags(); err != nil {
-			fmt.Fprintf(os.Stderr, "Git push error: %v\n", err)
-			os.Exit(1)
+		if config.Conf.Info.HasRemote {
+			plan.Steps = append(plan.Steps, PlanStep{
+				Type:        StepGitPush,
+				Description: "Git push commits and tags",
+				Action: func() error {
+					return git.PushTags()
+				},
+			})
 		}
 	}
 
-	return nil
+	return plan, nil
 }
 
 // discoverVersion searches for a version file in the current directory and returns its path,
@@ -175,17 +275,22 @@ func extractVersion(filename string, content []byte) (string, error) {
 
 // determineNextVersion calculates the next version based on a target ("major", "minor", "patch",
 // or a specific version string) or automatically by analyzing Git commit messages.
-func determineNextVersion(current *semver.Version, target string, setVersion string) (*semver.Version, error) {
+func determineNextVersion(current *semver.Version, target string, setVersion string) (*semver.Version, []string, string, error) {
 	action := strings.TrimSpace(strings.ToLower(target))
+	var commits []string
+	var lastTag string
 
 	if action == "ver" {
-		return semver.NewVersion(setVersion)
+		v, err := semver.NewVersion(setVersion)
+		return v, nil, "", err
 	}
 
 	if action == "auto" {
-		auto, err := autoVersion()
+		var auto string
+		var err error
+		auto, commits, lastTag, err = autoVersion()
 		if err != nil {
-			return nil, err
+			return nil, nil, "", err
 		}
 		if auto != "" {
 			fmt.Printf("Auto-detected version bump: %s\n", auto)
@@ -204,31 +309,32 @@ func determineNextVersion(current *semver.Version, target string, setVersion str
 	default:
 		next = *current
 	}
-	return &next, nil
+	return &next, commits, lastTag, nil
 }
 
-func autoVersion() (string, error) {
+func autoVersion() (string, []string, string, error) {
 	// Automatic mode based on Git history
 	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
-	lastTag, err := cmd.Output()
+	lastTagBytes, err := cmd.Output()
 	var logCmd *exec.Cmd
+	lastTag := ""
 
 	if err != nil {
 		// No tags found, get all commits
 		logCmd = exec.Command("git", "log", "--oneline")
 	} else {
-		tag := strings.TrimSpace(string(lastTag))
-		logCmd = exec.Command("git", "log", fmt.Sprintf("%s..HEAD", tag), "--oneline")
+		lastTag = strings.TrimSpace(string(lastTagBytes))
+		logCmd = exec.Command("git", "log", fmt.Sprintf("%s..HEAD", lastTag), "--oneline")
 	}
 
 	logOutput, err := logCmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to get git log: %w", err)
+		return "", nil, "", fmt.Errorf("failed to get git log: %w", err)
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(logOutput)), "\n")
 	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
-		return "", nil // No new commits
+		return "", nil, lastTag, nil // No new commits
 	}
 
 	bumpMajor := false
@@ -253,15 +359,16 @@ func autoVersion() (string, error) {
 		}
 	}
 
+	action := ""
 	if bumpMajor {
-		return "major", nil
+		action = "major"
 	} else if bumpMinor {
-		return "minor", nil
+		action = "minor"
 	} else if bumpPatch {
-		return "patch", nil
+		action = "patch"
 	}
 
-	return "", nil
+	return action, lines, lastTag, nil
 }
 
 func parseCommit(msg string) (bool, bool, bool) {

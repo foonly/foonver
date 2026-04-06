@@ -68,6 +68,7 @@ type GitInfo struct {
 }
 
 type Config struct {
+	DryRun    bool   `mapstructure:"dry-run"`
 	Push      bool   `mapstructure:"push"`
 	Prefix    string `mapstructure:"prefix"`
 	Verbosity Level  `mapstructure:"verbosity"`
@@ -86,6 +87,7 @@ func Init() {
 	viper.AddConfigPath(xdg.ConfigHome)
 	viper.AddConfigPath(Conf.Info.RootDir)
 
+	viper.SetDefault("dry-run", false)
 	viper.SetDefault("push", false)
 	viper.SetDefault("prefix", "v")
 	viper.SetDefault("verbosity", "normal")
@@ -130,6 +132,10 @@ func Init() {
 
 func processFlags() {
 	// This function can be used to process command-line flags and override config values if needed.
+	if viper.IsSet("dry-run") && viper.GetBool("dry-run") {
+		Conf.DryRun = true
+	}
+
 	if viper.IsSet("push") && viper.GetBool("push") {
 		Conf.Push = true
 	}

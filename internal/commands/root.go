@@ -14,6 +14,7 @@ var (
 	flagPush      bool
 	flagNoPush    bool
 	flagChangelog bool
+	flagDryRun    bool
 )
 
 var rootCmd = &cobra.Command{
@@ -38,6 +39,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&flagPush, "push", false, "push new versions to the remote repository")
 	rootCmd.PersistentFlags().BoolVar(&flagNoPush, "no-push", false, "don't push new versions to the remote repository")
 	rootCmd.PersistentFlags().BoolVarP(&flagChangelog, "changelog", "c", false, "automatically update CHANGELOG.md")
+	rootCmd.PersistentFlags().BoolVar(&flagDryRun, "dry-run", false, "simulate the full flow without changing files, tags, or git state")
 
 	rootCmd.MarkFlagsMutuallyExclusive("quiet", "normal", "verbose", "debug")
 	rootCmd.MarkFlagsMutuallyExclusive("push", "no-push")
@@ -49,6 +51,7 @@ func init() {
 	viper.BindPFlag("normal", rootCmd.PersistentFlags().Lookup("normal"))
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+	viper.BindPFlag("dry-run", rootCmd.PersistentFlags().Lookup("dry-run"))
 
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
