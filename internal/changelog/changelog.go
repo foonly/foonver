@@ -182,7 +182,7 @@ func renderGroupedCommits(b *strings.Builder, commits []string) {
 	for _, t := range order {
 		if items, ok := groups[t]; ok {
 			title := typeTitles[t]
-			b.WriteString("#### " + title + "\n")
+			b.WriteString("#### " + title + "\n\n")
 			for _, item := range items {
 				b.WriteString("- " + item + "\n")
 			}
