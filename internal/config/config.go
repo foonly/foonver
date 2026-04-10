@@ -101,9 +101,9 @@ func Init() {
 	if err != nil {
 		var configNotFound viper.ConfigFileNotFoundError
 		if errors.As(err, &configNotFound) {
-			fmt.Printf("No config file found, using defaults\n")
+			fmt.Fprintf(os.Stderr, "No config file found, using defaults\n")
 		} else {
-			fmt.Printf("Error reading config file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error reading config file: %v\n", err)
 			os.Exit(1)
 		}
 	}
@@ -124,7 +124,7 @@ func Init() {
 		),
 	))
 	if err != nil {
-		fmt.Printf("Error unmarshalling config: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error unmarshalling config: %v\n", err)
 	}
 
 	processFlags()
