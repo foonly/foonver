@@ -1,18 +1,40 @@
-# action.yml
 name: "Run foonver"
-description: "Automate SemVer bumping using pre-compiled foonver binary"
+description: "Automate SemVer bumping and changelog management"
 inputs:
   version:
-    description: "Version of foonver to use (e.g., v0.6.0)"
+    description: "Version of foonver binary to download (e.g., v0.8.1)"
     required: false
     default: "latest"
+  command:
+    description: "foonver command to run (auto, patch, minor, major)"
+    required: false
+    default: "auto"
   changelog:
     description: "Whether to update CHANGELOG.md"
     required: false
     default: "true"
-  args:
-    description: "Additional arguments for foonver"
+  push:
+    description: "Whether to push the created commit and tag"
     required: false
+    default: "false"
+  dry_run:
+    description: "Run in dry-run mode (outputs version without making changes)"
+    required: false
+    default: "false"
+  args:
+    description: "Additional raw arguments for foonver"
+    required: false
+
+outputs:
+  version:
+    description: "The new version string"
+    value: ${{ steps.run.outputs.version }}
+  is_bumped:
+    description: "Whether a version bump occurred"
+    value: ${{ steps.run.outputs.is_bumped }}
+  release_notes:
+    description: "The generated release notes for the latest version"
+    value: ${{ steps.run.outputs.release_notes }}
 
 runs:
   using: "composite"
@@ -32,15 +54,53 @@ runs:
         chmod +x /usr/local/bin/foonver
 
     - name: Run foonver
+      id: run
       shell: bash
       run: |
         ARGS="${{ inputs.args }}"
+
         if [ "${{ inputs.changelog }}" == "true" ]; then
           ARGS="--changelog $ARGS"
         fi
 
-        # Ensure git is configured for the commit/tag foonver will create
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        if [ "${{ inputs.push }}" == "true" ]; then
+          ARGS="--push $ARGS"
+        else
+          ARGS="--no-push $ARGS"
+        fi
 
-        foonver $ARGS
+        if [ "${{ inputs.dry_run }}" == "true" ]; then
+          ARGS="--dry-run $ARGS"
+        fi
+
+        # Ensure git identity is set for commits/tags
+        if [ -z "$(git config user.name)" ]; then
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        fi
+
+        # Run foonver with --json to get structured output
+        # We also use --release-notes to a temporary file to capture the delta
+        TEMP_NOTES=$(mktemp)
+        PLAN_JSON=$(foonver ${{ inputs.command }} $ARGS --json --release-notes "$TEMP_NOTES")
+
+        # Use jq to extract data from the plan
+        NEW_VERSION=$(echo "$PLAN_JSON" | jq -r '.next_version')
+        OLD_VERSION=$(echo "$PLAN_JSON" | jq -r '.current_version')
+
+        IS_BUMPED="false"
+        if [ "$NEW_VERSION" != "$OLD_VERSION" ]; then
+          IS_BUMPED="true"
+        fi
+
+        # Set outputs
+        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "is_bumped=$IS_BUMPED" >> $GITHUB_OUTPUT
+
+        # Capture release notes as a multiline output
+        if [ -f "$TEMP_NOTES" ]; then
+          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+          cat "$TEMP_NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          rm "$TEMP_NOTES"
+        fi

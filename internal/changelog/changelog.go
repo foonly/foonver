@@ -34,14 +34,16 @@ import (
 // Each tag section includes commits between previousTag..tag.
 // The first tag includes all commits reachable from that tag.
 // If there are commits since the last tag, they are grouped under nextVersion (or "Unreleased" if empty).
-func GenerateMarkdown(nextVersion string) (string, error) {
+func GenerateMarkdown(nextVersion string, latestOnly bool) (string, error) {
 	tags, err := git.GetTags()
 	if err != nil {
 		return "", err
 	}
 
 	var b strings.Builder
-	b.WriteString("# Changelog\n\n")
+	if !latestOnly {
+		b.WriteString("# Changelog\n\n")
+	}
 
 	// No tags: fall back to full history.
 	if len(tags) == 0 {
@@ -72,6 +74,9 @@ func GenerateMarkdown(nextVersion string) (string, error) {
 		group, err := generateGroup(fmt.Sprintf("%s..HEAD", lastTag.Name), title, dateNow)
 		if err == nil {
 			b.WriteString(group)
+			if latestOnly {
+				return b.String(), nil
+			}
 		}
 	}
 
@@ -92,6 +97,10 @@ func GenerateMarkdown(nextVersion string) (string, error) {
 			return "", err
 		}
 		b.WriteString(group)
+
+		if latestOnly {
+			return b.String(), nil
+		}
 	}
 
 	return b.String(), nil
@@ -99,7 +108,7 @@ func GenerateMarkdown(nextVersion string) (string, error) {
 
 // WriteChangelog generates the markdown and writes it to the configured file.
 func WriteChangelog(nextVersion string) (string, error) {
-	md, err := GenerateMarkdown(nextVersion)
+	md, err := GenerateMarkdown(nextVersion, false)
 	if err != nil {
 		return "", err
 	}

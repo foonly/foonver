@@ -68,14 +68,17 @@ type GitInfo struct {
 }
 
 type Config struct {
-	DryRun    bool   `mapstructure:"dry-run"`
-	Push      bool   `mapstructure:"push"`
-	Prefix    string `mapstructure:"prefix"`
-	Verbosity Level  `mapstructure:"verbosity"`
-	Parser    string `mapstructure:"parser"`
-	Changelog bool   `mapstructure:"changelog"`
-	File      string `mapstructure:"file"`
-	Info      GitInfo
+	DryRun       bool   `mapstructure:"dry-run"`
+	Push         bool   `mapstructure:"push"`
+	Prefix       string `mapstructure:"prefix"`
+	Verbosity    Level  `mapstructure:"verbosity"`
+	Parser       string `mapstructure:"parser"`
+	Changelog    bool   `mapstructure:"changelog"`
+	File         string `mapstructure:"file"`
+	ReleaseNotes string `mapstructure:"release-notes"`
+	PrintVersion bool   `mapstructure:"print-version"`
+	JSON         bool   `mapstructure:"json"`
+	Info         GitInfo
 }
 
 var Conf Config
@@ -94,6 +97,9 @@ func Init() {
 	viper.SetDefault("parser", "all")
 	viper.SetDefault("changelog", false)
 	viper.SetDefault("file", "CHANGELOG.md")
+	viper.SetDefault("release-notes", "")
+	viper.SetDefault("print-version", false)
+	viper.SetDefault("json", false)
 
 	// Find and read the config file
 	err := viper.ReadInConfig()
@@ -145,6 +151,18 @@ func processFlags() {
 
 	if viper.IsSet("changelog") && viper.GetBool("changelog") {
 		Conf.Changelog = true
+	}
+
+	if viper.IsSet("release-notes") {
+		Conf.ReleaseNotes = viper.GetString("release-notes")
+	}
+
+	if viper.IsSet("print-version") && viper.GetBool("print-version") {
+		Conf.PrintVersion = true
+	}
+
+	if viper.IsSet("json") && viper.GetBool("json") {
+		Conf.JSON = true
 	}
 
 	if viper.IsSet("quiet") && viper.GetBool("quiet") {

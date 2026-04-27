@@ -27,22 +27,25 @@ const (
 	StepGitCommit         StepType = "GitCommit"
 	StepGitTag            StepType = "GitTag"
 	StepGitPush           StepType = "GitPush"
+	StepWriteReleaseNotes StepType = "WriteReleaseNotes"
 )
 
 type PlanStep struct {
-	Type        StepType
-	Description string
-	Action      func() error
+	Type        StepType     `json:"type"`
+	Description string       `json:"description"`
+	Action      func() error `json:"-"`
 }
 
 type ExecutionPlan struct {
-	CurrentVersion *semver.Version
-	NextVersion    *semver.Version
-	VersionFile    string
-	Commits        []string
-	LastTag        string
-	IsDirty        bool
-	Steps          []PlanStep
+	CurrentVersion    *semver.Version `json:"-"`
+	CurrentVersionStr string          `json:"current_version"`
+	NextVersion       *semver.Version `json:"-"`
+	NextVersionStr    string          `json:"next_version"`
+	VersionFile       string          `json:"version_file"`
+	Commits           []string        `json:"commits"`
+	LastTag           string          `json:"last_tag"`
+	IsDirty           bool            `json:"is_dirty"`
+	Steps             []PlanStep      `json:"steps"`
 }
 
 var versionFiles = []string{
@@ -60,36 +63,52 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 		os.Exit(1)
 	}
 
-	fmt.Printf("Found version %s in %s\n", plan.CurrentVersion.Original(), plan.VersionFile)
-	if plan.LastTag != "" {
-		fmt.Printf("Last version tag: %s\n", plan.LastTag)
-	}
+	nextVersionStr := plan.NextVersionStr
+	quiet := config.Conf.PrintVersion || config.Conf.JSON
 
-	if len(plan.Commits) > 0 {
-		fmt.Println("Commits since last tag:")
-		for _, c := range plan.Commits {
-			fmt.Printf("  %s\n", c)
+	if !quiet {
+		fmt.Printf("Found version %s in %s\n", plan.CurrentVersion.Original(), plan.VersionFile)
+		if plan.LastTag != "" {
+			fmt.Printf("Last version tag: %s\n", plan.LastTag)
+		}
+
+		if len(plan.Commits) > 0 {
+			fmt.Println("Commits since last tag:")
+			for _, c := range plan.Commits {
+				fmt.Printf("  %s\n", c)
+			}
 		}
 	}
 
-	nextVersionStr := plan.NextVersion.String()
-	if strings.HasPrefix(plan.CurrentVersion.Original(), "v") {
-		nextVersionStr = "v" + nextVersionStr
-	}
-
 	if plan.CurrentVersion.String() == plan.NextVersion.String() {
-		fmt.Println("Version is already up to date.")
+		if config.Conf.JSON {
+			data, _ := json.MarshalIndent(plan, "", "  ")
+			fmt.Println(string(data))
+		} else if config.Conf.PrintVersion {
+			fmt.Println(nextVersionStr)
+		} else {
+			fmt.Println("Version is already up to date.")
+		}
 		return nil
 	}
 
-	fmt.Printf("Next version: %s\n", nextVersionStr)
+	if !quiet {
+		fmt.Printf("Next version: %s\n", nextVersionStr)
+	}
 
 	if config.Conf.DryRun {
-		fmt.Println("\nMode: dry-run (no changes will be made)")
-		fmt.Printf("Repo clean: %t\n", !plan.IsDirty)
-		fmt.Println("Planned actions:")
-		for _, step := range plan.Steps {
-			fmt.Printf("  - %s\n", step.Description)
+		if config.Conf.JSON {
+			data, _ := json.MarshalIndent(plan, "", "  ")
+			fmt.Println(string(data))
+		} else if config.Conf.PrintVersion {
+			fmt.Println(nextVersionStr)
+		} else {
+			fmt.Println("\nMode: dry-run (no changes will be made)")
+			fmt.Printf("Repo clean: %t\n", !plan.IsDirty)
+			fmt.Println("Planned actions:")
+			for _, step := range plan.Steps {
+				fmt.Printf("  - %s\n", step.Description)
+			}
 		}
 		return nil
 	}
@@ -100,7 +119,7 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, step := range plan.Steps {
-		if config.Conf.Verbosity >= config.Normal {
+		if config.Conf.Verbosity >= config.Normal && !quiet {
 			fmt.Printf("Executing: %s...\n", step.Description)
 		}
 		if err := step.Action(); err != nil {
@@ -108,7 +127,14 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Printf("Successfully bumped version to %s\n", nextVersionStr)
+	if config.Conf.JSON {
+		data, _ := json.MarshalIndent(plan, "", "  ")
+		fmt.Println(string(data))
+	} else if config.Conf.PrintVersion {
+		fmt.Println(nextVersionStr)
+	} else {
+		fmt.Printf("Successfully bumped version to %s\n", nextVersionStr)
+	}
 	return nil
 }
 
@@ -137,23 +163,25 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 		return nil, err
 	}
 
+	nextVersionStr := nextVersion.String()
+	if strings.HasPrefix(currentVersion.Original(), "v") {
+		nextVersionStr = "v" + nextVersionStr
+	}
+
 	plan := &ExecutionPlan{
-		CurrentVersion: currentVersion,
-		NextVersion:    nextVersion,
-		VersionFile:    fileName,
-		Commits:        commits,
-		LastTag:        lastTag,
-		IsDirty:        !git.IsClean(),
-		Steps:          []PlanStep{},
+		CurrentVersion:    currentVersion,
+		CurrentVersionStr: currentVersion.Original(),
+		NextVersion:       nextVersion,
+		NextVersionStr:    nextVersionStr,
+		VersionFile:       fileName,
+		Commits:           commits,
+		LastTag:           lastTag,
+		IsDirty:           !git.IsClean(),
+		Steps:             []PlanStep{},
 	}
 
 	if currentVersion.String() == nextVersion.String() {
 		return plan, nil
-	}
-
-	nextVersionStr := nextVersion.String()
-	if strings.HasPrefix(currentVersion.Original(), "v") {
-		nextVersionStr = "v" + nextVersionStr
 	}
 
 	// 1. Update version file
@@ -173,6 +201,20 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 			Action: func() error {
 				_, err := changelog.WriteChangelog(nextVersionStr)
 				return err
+			},
+		})
+	}
+
+	if config.Conf.ReleaseNotes != "" {
+		plan.Steps = append(plan.Steps, PlanStep{
+			Type:        StepWriteReleaseNotes,
+			Description: fmt.Sprintf("Write release notes: %s", config.Conf.ReleaseNotes),
+			Action: func() error {
+				md, err := changelog.GenerateMarkdown(nextVersionStr, true)
+				if err != nil {
+					return err
+				}
+				return os.WriteFile(config.Conf.ReleaseNotes, []byte(md), 0644)
 			},
 		})
 	}
@@ -292,7 +334,7 @@ func determineNextVersion(current *semver.Version, target string, setVersion str
 		if err != nil {
 			return nil, nil, "", err
 		}
-		if auto != "" {
+		if auto != "" && !config.Conf.PrintVersion && !config.Conf.JSON {
 			fmt.Printf("Auto-detected version bump: %s\n", auto)
 		}
 		action = auto

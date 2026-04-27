@@ -8,14 +8,17 @@ import (
 )
 
 var (
-	flagQuiet     bool
-	flagNormal    bool
-	flagVerbose   bool
-	flagDebug     bool
-	flagPush      bool
-	flagNoPush    bool
-	flagChangelog bool
-	flagDryRun    bool
+	flagQuiet        bool
+	flagNormal       bool
+	flagVerbose      bool
+	flagDebug        bool
+	flagPush         bool
+	flagNoPush       bool
+	flagChangelog    bool
+	flagDryRun       bool
+	flagReleaseNotes string
+	flagPrintVersion bool
+	flagJSON         bool
 )
 
 var rootCmd = &cobra.Command{
@@ -41,6 +44,9 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&flagNoPush, "no-push", false, "don't push new versions to the remote repository")
 	rootCmd.PersistentFlags().BoolVarP(&flagChangelog, "changelog", "c", false, "automatically update CHANGELOG.md")
 	rootCmd.PersistentFlags().BoolVar(&flagDryRun, "dry-run", false, "simulate the full flow without changing files, tags, or git state")
+	rootCmd.PersistentFlags().StringVar(&flagReleaseNotes, "release-notes", "", "write delta changelog to this file")
+	rootCmd.PersistentFlags().BoolVar(&flagPrintVersion, "print-version", false, "only print the new version number")
+	rootCmd.PersistentFlags().BoolVar(&flagJSON, "json", false, "output result as JSON")
 
 	rootCmd.MarkFlagsMutuallyExclusive("quiet", "normal", "verbose", "debug")
 	rootCmd.MarkFlagsMutuallyExclusive("push", "no-push")
@@ -53,6 +59,9 @@ func init() {
 	viper.BindPFlag("verbose", rootCmd.PersistentFlags().Lookup("verbose"))
 	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 	viper.BindPFlag("dry-run", rootCmd.PersistentFlags().Lookup("dry-run"))
+	viper.BindPFlag("release-notes", rootCmd.PersistentFlags().Lookup("release-notes"))
+	viper.BindPFlag("print-version", rootCmd.PersistentFlags().Lookup("print-version"))
+	viper.BindPFlag("json", rootCmd.PersistentFlags().Lookup("json"))
 
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
