@@ -31,7 +31,7 @@ jobs:
 
       - name: Run foonver
         id: foonver
-        uses: foonly-dev/foonver@v0.9.0
+        uses: foonly/foonver@v0.9.0
         with:
           command: "auto"
           changelog: "true"

@@ -19,7 +19,7 @@ Ensure you have [Go](https://go.dev/) (1.25.0 or later) installed.
 
 ```bash
 # Clone the repository
-git clone https://github.com/foonly-dev/foonver.git
+git clone https://github.com/foonly/foonver.git
 cd foonver
 
 # Build and install
