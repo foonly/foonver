@@ -1,6 +1,12 @@
 # Changelog
 
-### 0.8.2 (2026-04-10)
+## 0.9.0 (2026-04-27)
+
+#### Features
+
+- add machine-readable CLI flags and enhance GitHub Action (f8f4442)
+
+### v0.8.2 (2026-04-10)
 
 #### Bug Fixes
 
