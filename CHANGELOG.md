@@ -1,5 +1,12 @@
 # Changelog
 
+### 0.8.2 (2026-04-10)
+
+#### Bug Fixes
+
+- Change some error messages to print to stderr instead of stdout (dde878f)
+- changelog: Add blank line after group titles (ec13aaa)
+
 ### v0.8.1 (2026-04-08)
 
 #### Bug Fixes
