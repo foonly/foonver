@@ -1,6 +1,16 @@
 # Changelog
 
-## 0.9.0 (2026-04-27)
+### 0.9.1 (2026-04-27)
+
+#### Documentation
+
+- update repository and action paths to foonly organization (ac4196c)
+
+#### Continuous Integration
+
+- github: automate release workflow using foonver (34535cb)
+
+## v0.9.0 (2026-04-27)
 
 #### Features
 
