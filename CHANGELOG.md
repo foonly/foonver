@@ -1,6 +1,17 @@
 # Changelog
 
-## 0.10.0 (2026-04-28)
+## 0.11.0 (2026-04-28)
+
+#### Features
+
+- cli: add version sync functionality for external files (0e305cd)
+
+#### Continuous Integration
+
+- github: remove version_sync from release workflow (46be0ff)
+- github: update pkgname for AUR deployment (772c0b3)
+
+## v0.10.0 (2026-04-28)
 
 #### Features
 
