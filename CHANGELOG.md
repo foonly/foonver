@@ -1,6 +1,12 @@
 # Changelog
 
-### 0.11.1 (2026-04-28)
+### 0.11.2 (2026-04-28)
+
+#### Bug Fixes
+
+- aur: update source URL to point to correct repository (a816f46)
+
+### v0.11.1 (2026-04-28)
 
 #### Continuous Integration
 
