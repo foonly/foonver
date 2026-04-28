@@ -251,6 +251,106 @@ func TestParseCommit(t *testing.T) {
 	}
 }
 
+func TestSyncVersion(t *testing.T) {
+	tests := []struct {
+		name       string
+		filename   string
+		content    string
+		oldVersion string
+		newVersion string
+		want       string
+		wantErr    bool
+	}{
+		{
+			name:       "readme sync with 'version:' prefix",
+			filename:   "README.md",
+			content:    "# My Project\n\nThis is version: 1.0.0\n",
+			oldVersion: "1.0.0",
+			newVersion: "1.1.0",
+			want:       "# My Project\n\nThis is version: 1.1.0\n",
+			wantErr:    false,
+		},
+		{
+			name:       "docs sync with 'v' prefix",
+			filename:   "docs.md",
+			content:    "Current version is v1.2.3 and should be updated.",
+			oldVersion: "1.2.3",
+			newVersion: "2.0.0",
+			want:       "Current version is v2.0.0 and should be updated.",
+			wantErr:    false,
+		},
+		{
+			name:       "case insensitive 'VERSION' prefix",
+			filename:   "INSTALL.txt",
+			content:    "VERSION 0.8.0-rc1",
+			oldVersion: "0.8.0-rc1",
+			newVersion: "0.9.0",
+			want:       "VERSION 0.9.0",
+			wantErr:    false,
+		},
+		{
+			name:       "punctuation handling",
+			filename:   "README.md",
+			content:    "### Version: 1.0.0-beta.1",
+			oldVersion: "1.0.0-beta.1",
+			newVersion: "1.0.0",
+			want:       "### Version: 1.0.0",
+			wantErr:    false,
+		},
+		{
+			name:       "missing version fails",
+			filename:   "missing.md",
+			content:    "No version string here.",
+			oldVersion: "1.0.0",
+			newVersion: "1.1.0",
+			want:       "",
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a temp file
+			f, err := os.CreateTemp("", "sync_test_*.md")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.Remove(f.Name())
+
+			if _, err := f.Write([]byte(tt.content)); err != nil {
+				t.Fatal(err)
+			}
+			f.Close()
+
+			// Set root dir to temp dir so syncVersion can find it
+			oldRoot := config.Conf.Info.RootDir
+			config.Conf.Info.RootDir = os.TempDir()
+			defer func() { config.Conf.Info.RootDir = oldRoot }()
+
+			// syncVersion expects a relative path to RootDir
+			relPath := f.Name()[len(os.TempDir()):]
+			if relPath[0] == os.PathSeparator {
+				relPath = relPath[1:]
+			}
+
+			err = syncVersion(relPath, tt.oldVersion, tt.newVersion)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("syncVersion() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if !tt.wantErr {
+				got, err := os.ReadFile(f.Name())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(got) != tt.want {
+					t.Errorf("syncVersion() got = %q, want %q", string(got), tt.want)
+				}
+			}
+		})
+	}
+}
+
 func TestUpdateVersionFile(t *testing.T) {
 	tests := []struct {
 		name       string

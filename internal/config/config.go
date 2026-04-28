@@ -68,16 +68,17 @@ type GitInfo struct {
 }
 
 type Config struct {
-	DryRun       bool   `mapstructure:"dry-run"`
-	Push         bool   `mapstructure:"push"`
-	Prefix       string `mapstructure:"prefix"`
-	Verbosity    Level  `mapstructure:"verbosity"`
-	Parser       string `mapstructure:"parser"`
-	Changelog    bool   `mapstructure:"changelog"`
-	File         string `mapstructure:"file"`
-	ReleaseNotes string `mapstructure:"release-notes"`
-	PrintVersion bool   `mapstructure:"print-version"`
-	JSON         bool   `mapstructure:"json"`
+	DryRun       bool     `mapstructure:"dry-run"`
+	Push         bool     `mapstructure:"push"`
+	Prefix       string   `mapstructure:"prefix"`
+	Verbosity    Level    `mapstructure:"verbosity"`
+	Parser       string   `mapstructure:"parser"`
+	Changelog    bool     `mapstructure:"changelog"`
+	File         string   `mapstructure:"file"`
+	VersionSync  []string `mapstructure:"version-sync"`
+	ReleaseNotes string   `mapstructure:"release-notes"`
+	PrintVersion bool     `mapstructure:"print-version"`
+	JSON         bool     `mapstructure:"json"`
 	Info         GitInfo
 }
 
@@ -97,6 +98,7 @@ func Init() {
 	viper.SetDefault("parser", "all")
 	viper.SetDefault("changelog", false)
 	viper.SetDefault("file", "CHANGELOG.md")
+	viper.SetDefault("version-sync", []string{})
 	viper.SetDefault("release-notes", "")
 	viper.SetDefault("print-version", false)
 	viper.SetDefault("json", false)

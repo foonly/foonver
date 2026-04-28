@@ -1,5 +1,7 @@
 # Foonver
 
+Version 0.9.0
+
 `foonver` is a lightweight CLI utility for automated Semantic Versioning (SemVer) management. Inspired by the functionality of `npm version`, it simplifies the release workflow by automating version bumping, file updates, and Git lifecycle operations.
 
 ## Features
@@ -7,6 +9,7 @@
 - **Plan-First Workflow**: Preview exactly what will happen before any files are changed.
 - **Automated Versioning**: Intelligently determines the next version by analyzing Git commit history since the last tag.
 - **Multi-format Support**: Discovers and updates version strings in `package.json`, `version.json`, `version.toml`, `version.txt`, and `version.md`.
+- **Version Synchronization**: Update version mentions in arbitrary files (like READMEs or documentation) automatically.
 - **Git Integration**:
   - Validates repository state before mutating.
   - Creates dedicated version-bump commits and tags.
@@ -91,6 +94,9 @@ changelog = true
 
 # The name of the changelog file
 file = "CHANGELOG.md"
+
+# Synchronize version in other files (finds first mention with "version" or "v" prefix)
+version-sync = ["README.md", "docs/install.md"]
 ```
 
 ## Supported Version Files

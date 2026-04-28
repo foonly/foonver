@@ -28,6 +28,7 @@ const (
 	StepGitTag            StepType = "GitTag"
 	StepGitPush           StepType = "GitPush"
 	StepWriteReleaseNotes StepType = "WriteReleaseNotes"
+	StepSyncVersion       StepType = "SyncVersion"
 )
 
 type PlanStep struct {
@@ -193,7 +194,19 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 		},
 	})
 
-	// 2. Changelog
+	// 2. Version Sync
+	for _, syncFile := range config.Conf.VersionSync {
+		sFile := syncFile // capture for closure
+		plan.Steps = append(plan.Steps, PlanStep{
+			Type:        StepSyncVersion,
+			Description: fmt.Sprintf("Sync version in %s: %s -> %s", sFile, currentVersion.Original(), nextVersionStr),
+			Action: func() error {
+				return syncVersion(sFile, currentVersion.Original(), nextVersionStr)
+			},
+		})
+	}
+
+	// 3. Changelog
 	if config.Conf.Changelog {
 		plan.Steps = append(plan.Steps, PlanStep{
 			Type:        StepUpdateChangelog,
@@ -219,12 +232,15 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 		})
 	}
 
-	// 3. Commit and Tag
+	// 4. Commit and Tag
 	plan.Steps = append(plan.Steps, PlanStep{
 		Type:        StepGitCommit,
 		Description: fmt.Sprintf("Git commit and tag: %s", nextVersionStr),
 		Action: func() error {
 			files := []string{fileName}
+			for _, syncFile := range config.Conf.VersionSync {
+				files = append(files, path.Join(config.Conf.Info.RootDir, syncFile))
+			}
 			if config.Conf.Changelog {
 				changelogPath := path.Join(config.Conf.Info.RootDir, config.Conf.File)
 				files = append(files, changelogPath)
@@ -233,7 +249,7 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 		},
 	})
 
-	// 4. Push
+	// 5. Push
 	if config.Conf.Push {
 		if config.Conf.Info.HasRemote {
 			plan.Steps = append(plan.Steps, PlanStep{
@@ -510,4 +526,45 @@ func updateVersionFile(filename, oldVersion, newVersion string, content []byte) 
 	}
 
 	return os.WriteFile(filename, newContent, 0644)
+}
+
+// syncVersion finds the first mention of the old version in the file preceded by "version" or "v"
+// (case insensitive, optional punctuation/whitespace) and replaces it with the new version.
+func syncVersion(filename, oldVersion, newVersion string) error {
+	filePath := path.Join(config.Conf.Info.RootDir, filename)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file for sync: %w", err)
+	}
+
+	// Regex explained:
+	// (?i)         : Case-insensitive
+	// (version|v)  : Match "version" or "v"
+	// [[:punct:]\s]* : Optional punctuation or whitespace
+	// (%s)         : The old version string (quoted/escaped)
+	quotedOld := regexp.QuoteMeta(oldVersion)
+	reStr := fmt.Sprintf(`(?i)(version|v)[[:punct:]\s]*(%s)`, quotedOld)
+	re, err := regexp.Compile(reStr)
+	if err != nil {
+		return fmt.Errorf("failed to compile sync regex: %w", err)
+	}
+
+	loc := re.FindSubmatchIndex(content)
+	if loc == nil {
+		return fmt.Errorf("could not find version '%s' with prefix 'version' or 'v' in %s", oldVersion, filename)
+	}
+
+	// Submatch indices:
+	// loc[0], loc[1] : full match
+	// loc[2], loc[3] : "version" or "v"
+	// loc[4], loc[5] : the version string itself
+	start := loc[4]
+	end := loc[5]
+
+	var newContent bytes.Buffer
+	newContent.Write(content[:start])
+	newContent.WriteString(newVersion)
+	newContent.Write(content[end:])
+
+	return os.WriteFile(filePath, newContent.Bytes(), 0644)
 }
