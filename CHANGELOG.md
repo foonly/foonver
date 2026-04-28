@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.10.0 (2026-04-28)
+
+#### Features
+
+- version: add support for synchronizing version strings in arbitrary files (1db3c6b)
+
+#### Documentation
+
+- github-actions: prepend v prefix to release tag name (43db53f)
+
+#### Continuous Integration
+
+- aur: automate publishing to AUR on release (116da19)
+- release: prefix release tag with v (bb4dd46)
+
+### v0.9.1 (2026-04-27)
+
 ### 0.9.1 (2026-04-27)
 
 #### Documentation
@@ -9,6 +26,9 @@
 #### Continuous Integration
 
 - github: automate release workflow using foonver (34535cb)
+
+### Misc
+- v0.9.1 (8ce59a6)
 
 ## v0.9.0 (2026-04-27)
 
