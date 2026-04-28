@@ -25,7 +25,7 @@ if [ ! -f "$PKGBUILD" ]; then
 fi
 
 # Download the source tarball to calculate the checksum
-SOURCE_URL="https://github.com/JCO-Digital/jman/archive/refs/tags/v${VERSION}.tar.gz"
+SOURCE_URL="https://github.com/foonly/foonver/archive/refs/tags/v${VERSION}.tar.gz"
 TEMP_FILE=$(mktemp)
 
 echo "Downloading ${SOURCE_URL}..."
