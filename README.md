@@ -1,6 +1,6 @@
 # Foonver
 
-Version 0.10.0
+Version 0.11.0
 
 `foonver` is a lightweight CLI utility for automated Semantic Versioning (SemVer) management. Inspired by the functionality of `npm version`, it simplifies the release workflow by automating version bumping, file updates, and Git lifecycle operations.
 
