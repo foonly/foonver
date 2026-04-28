@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.11.0 (2026-04-28)
+### 0.11.1 (2026-04-28)
+
+#### Continuous Integration
+
+- github: add version_sync to release workflow (d2645f4)
+
+## v0.11.0 (2026-04-28)
 
 #### Features
 
