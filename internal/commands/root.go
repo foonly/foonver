@@ -19,6 +19,7 @@ var (
 	flagReleaseNotes string
 	flagPrintVersion bool
 	flagJSON         bool
+	flagSync         []string
 )
 
 var rootCmd = &cobra.Command{
@@ -47,6 +48,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flagReleaseNotes, "release-notes", "", "write delta changelog to this file")
 	rootCmd.PersistentFlags().BoolVar(&flagPrintVersion, "print-version", false, "only print the new version number")
 	rootCmd.PersistentFlags().BoolVar(&flagJSON, "json", false, "output result as JSON")
+	rootCmd.PersistentFlags().StringSliceVar(&flagSync, "sync", []string{}, "files to synchronize version in")
 
 	rootCmd.MarkFlagsMutuallyExclusive("quiet", "normal", "verbose", "debug")
 	rootCmd.MarkFlagsMutuallyExclusive("push", "no-push")
@@ -62,6 +64,7 @@ func init() {
 	viper.BindPFlag("release-notes", rootCmd.PersistentFlags().Lookup("release-notes"))
 	viper.BindPFlag("print-version", rootCmd.PersistentFlags().Lookup("print-version"))
 	viper.BindPFlag("json", rootCmd.PersistentFlags().Lookup("json"))
+	viper.BindPFlag("version-sync", rootCmd.PersistentFlags().Lookup("sync"))
 
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }

@@ -50,14 +50,15 @@ jobs:
 
 ## Inputs
 
-| Input       | Description                                                                | Default  |
-| ----------- | -------------------------------------------------------------------------- | -------- |
-| `version`   | Version of the `foonver` binary to download.                               | `latest` |
-| `command`   | The foonver command to run (`auto`, `patch`, `minor`, `major`).            | `auto`   |
-| `changelog` | Whether to update the project's `CHANGELOG.md`.                            | `true`   |
-| `push`      | Whether to push the created commit and tag to the remote.                  | `false`  |
-| `dry_run`   | If `true`, simulates the bump and provides outputs without changing files. | `false`  |
-| `args`      | Additional raw CLI arguments to pass to `foonver`.                         | `""`     |
+| Input          | Description                                                                | Default  |
+| -------------- | -------------------------------------------------------------------------- | -------- |
+| `version`      | Version of the `foonver` binary to download.                               | `latest` |
+| `command`      | The foonver command to run (`auto`, `patch`, `minor`, `major`).            | `auto`   |
+| `changelog`    | Whether to update the project's `CHANGELOG.md`.                            | `true`   |
+| `push`         | Whether to push the created commit and tag to the remote.                  | `false`  |
+| `dry_run`      | If `true`, simulates the bump and provides outputs without changing files. | `false`  |
+| `version_sync` | Comma-separated list of files to synchronize version in.                   | `""`     |
+| `args`         | Additional raw CLI arguments to pass to `foonver`.                         | `""`     |
 
 ## Outputs
 

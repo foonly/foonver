@@ -21,6 +21,9 @@ inputs:
     description: "Run in dry-run mode (outputs version without making changes)"
     required: false
     default: "false"
+  version_sync:
+    description: "Comma-separated list of files to synchronize version in"
+    required: false
   args:
     description: "Additional raw arguments for foonver"
     required: false
@@ -71,6 +74,10 @@ runs:
 
         if [ "${{ inputs.dry_run }}" == "true" ]; then
           ARGS="--dry-run $ARGS"
+        fi
+
+        if [ -n "${{ inputs.version_sync }}" ]; then
+          ARGS="--sync ${{ inputs.version_sync }} $ARGS"
         fi
 
         # Ensure git identity is set for commits/tags

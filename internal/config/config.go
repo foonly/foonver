@@ -155,6 +155,10 @@ func processFlags() {
 		Conf.Changelog = true
 	}
 
+	if viper.IsSet("version-sync") {
+		Conf.VersionSync = viper.GetStringSlice("version-sync")
+	}
+
 	if viper.IsSet("release-notes") {
 		Conf.ReleaseNotes = viper.GetString("release-notes")
 	}
