@@ -36,6 +36,7 @@ jobs:
           changelog: "true"
           push: "true"
           version_sync: "README.md"
+          remote: ""
 
       - name: Build Release Binary
         # Re-build now that the new tag exists, so the version is embedded correctly
