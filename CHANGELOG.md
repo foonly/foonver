@@ -1,6 +1,16 @@
 # Changelog
 
-## 0.12.0 (2026-05-11)
+## 0.13.0 (2026-05-11)
+
+#### Features
+
+- git: add support for configurable remote for push operations (5b36e3e)
+
+#### Continuous Integration
+
+- github: add empty remote configuration to release workflow (4dc39fb)
+
+## v0.12.0 (2026-05-11)
 
 #### Features
 
