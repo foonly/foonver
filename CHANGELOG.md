@@ -1,6 +1,12 @@
 # Changelog
 
-### 0.11.2 (2026-04-28)
+### 0.11.3 (2026-05-11)
+
+#### Bug Fixes
+
+- changelog: support optional v prefix in version regex (b85b659)
+
+### v0.11.2 (2026-04-28)
 
 #### Bug Fixes
 
