@@ -144,7 +144,7 @@ func generateGroup(revRange string, name string, date string) (string, error) {
 	return b.String(), nil
 }
 
-var findVer = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`)
+var findVer = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`)
 var typeRegex = regexp.MustCompile(`(?i)^([a-z]+)(?:\((.*)\))?(!)?:\s*(.*)$`)
 
 var typeTitles = map[string]string{
