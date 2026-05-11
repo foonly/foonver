@@ -1,6 +1,12 @@
 # Changelog
 
-### 0.11.3 (2026-05-11)
+## 0.12.0 (2026-05-11)
+
+#### Features
+
+- commit: allow customization of version bump commit messages (ca6ac53)
+
+### v0.11.3 (2026-05-11)
 
 #### Bug Fixes
 
@@ -55,9 +61,6 @@
 #### Continuous Integration
 
 - github: automate release workflow using foonver (34535cb)
-
-### Misc
-- v0.9.1 (8ce59a6)
 
 ## v0.9.0 (2026-04-27)
 
