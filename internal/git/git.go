@@ -37,21 +37,19 @@ func EnsureRepo() error {
 	}
 
 	// Check if in Git repository
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	output, err := cmd.Output()
+	output, err := runGit("rev-parse", "--show-toplevel")
 	if err != nil {
 		config.Conf.Info.Ok = false
 		return fmt.Errorf("not inside a Git repository")
 	}
-	config.Conf.Info.RootDir = strings.TrimSpace(string(output))
+	config.Conf.Info.RootDir = strings.TrimSpace(output)
 
 	// Check for remotes
-	cmd = exec.Command("git", "remote")
-	output, err = cmd.Output()
+	output, err = runGit("remote")
 	if err != nil {
 		return fmt.Errorf("failed to check git remotes: %w", err)
 	}
-	if len(bytes.TrimSpace(output)) > 0 {
+	if len(strings.TrimSpace(output)) > 0 {
 		config.Conf.Info.HasRemote = true
 	}
 
@@ -60,12 +58,11 @@ func EnsureRepo() error {
 
 // IsClean checks for uncommitted changes in the working directory and updates config.Conf.Info.
 func IsClean() bool {
-	cmd := exec.Command("git", "status", "--porcelain")
-	output, err := cmd.Output()
+	output, err := runGit("status", "--porcelain")
 	if err != nil {
 		return false
 	}
-	config.Conf.Info.Clean = len(bytes.TrimSpace(output)) == 0
+	config.Conf.Info.Clean = len(strings.TrimSpace(output)) == 0
 	return config.Conf.Info.Clean
 }
 
@@ -82,13 +79,10 @@ func RunPreflightChecks() error {
 
 // CommitAndTag stages the version files, commits them with the version as the message, and creates a Git tag.
 func CommitAndTag(filenames []string, version string) error {
-	var cmd *exec.Cmd
-
 	// Add files
 	for _, filename := range filenames {
-		cmd = exec.Command("git", "add", filename)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("git add failed for %s: %w", filename, err)
+		if _, err := runGit("add", filename); err != nil {
+			return err
 		}
 	}
 
@@ -105,15 +99,13 @@ func CommitAndTag(filenames []string, version string) error {
 	}
 
 	// Commit
-	cmd = exec.Command("git", "commit", "-m", commitMsg)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("git commit failed: %w", err)
+	if _, err := runGit("commit", "-m", commitMsg); err != nil {
+		return err
 	}
 
 	// Tag
-	cmd = exec.Command("git", "tag", versionString)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("git tag failed: %w", err)
+	if _, err := runGit("tag", versionString); err != nil {
+		return err
 	}
 
 	return nil
@@ -121,13 +113,16 @@ func CommitAndTag(filenames []string, version string) error {
 
 // PushTags pushes local commits and tags to the remote repository.
 func PushTags() error {
-	cmd := exec.Command("git", "push")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("Failed to push commits: %v\n", err)
+	remote := config.Conf.Remote
+	if remote == "" {
+		remote = "origin"
 	}
-	cmd = exec.Command("git", "push", "--tags")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("Failed to push tags: %v\n", err)
+
+	if _, err := runGit("push", remote, "HEAD"); err != nil {
+		return err
+	}
+	if _, err := runGit("push", remote, "--tags"); err != nil {
+		return err
 	}
 	return nil
 }

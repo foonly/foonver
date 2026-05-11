@@ -71,6 +71,7 @@ type Config struct {
 	DryRun        bool     `mapstructure:"dry-run"`
 	Push          bool     `mapstructure:"push"`
 	Prefix        string   `mapstructure:"prefix"`
+	Remote        string   `mapstructure:"remote"`
 	Verbosity     Level    `mapstructure:"verbosity"`
 	Parser        string   `mapstructure:"parser"`
 	Changelog     bool     `mapstructure:"changelog"`
@@ -96,6 +97,7 @@ func Init() {
 	viper.SetDefault("dry-run", false)
 	viper.SetDefault("push", false)
 	viper.SetDefault("prefix", "v")
+	viper.SetDefault("remote", "origin")
 	viper.SetDefault("verbosity", "normal")
 	viper.SetDefault("parser", "all")
 	viper.SetDefault("changelog", false)
@@ -153,6 +155,10 @@ func processFlags() {
 	}
 	if viper.IsSet("no-push") && viper.GetBool("no-push") {
 		Conf.Push = false
+	}
+
+	if viper.IsSet("remote") {
+		Conf.Remote = viper.GetString("remote")
 	}
 
 	if viper.IsSet("changelog") && viper.GetBool("changelog") {

@@ -17,6 +17,10 @@ inputs:
     description: "Whether to push the created commit and tag"
     required: false
     default: "false"
+  remote:
+    description: "Git remote to push to"
+    required: false
+    default: "origin"
   commit_message:
     description: "Custom commit message"
     required: false
@@ -68,32 +72,42 @@ runs:
       id: run
       shell: bash
       run: |
-        ARGS="${{ inputs.args }}"
+        ARGS=()
 
         if [ "${{ inputs.changelog }}" == "true" ]; then
-          ARGS="--changelog $ARGS"
+          ARGS+=("--changelog")
         fi
 
         if [ "${{ inputs.push }}" == "true" ]; then
-          ARGS="--push $ARGS"
+          ARGS+=("--push")
         else
-          ARGS="--no-push $ARGS"
+          ARGS+=("--no-push")
+        fi
+
+        if [ -n "${{ inputs.remote }}" ]; then
+          ARGS+=("--remote" "${{ inputs.remote }}")
         fi
 
         if [ -n "${{ inputs.commit_message }}" ]; then
-          ARGS="--commit-message \"${{ inputs.commit_message }}\" $ARGS"
+          ARGS+=("--commit-message" "${{ inputs.commit_message }}")
         fi
 
         if [ -n "${{ inputs.commit_suffix }}" ]; then
-          ARGS="--commit-suffix \"${{ inputs.commit_suffix }}\" $ARGS"
+          ARGS+=("--commit-suffix" "${{ inputs.commit_suffix }}")
         fi
 
         if [ "${{ inputs.dry_run }}" == "true" ]; then
-          ARGS="--dry-run $ARGS"
+          ARGS+=("--dry-run")
         fi
 
         if [ -n "${{ inputs.version_sync }}" ]; then
-          ARGS="--sync ${{ inputs.version_sync }} $ARGS"
+          ARGS+=("--sync" "${{ inputs.version_sync }}")
+        fi
+
+        if [ -n "${{ inputs.args }}" ]; then
+          # Split args by space, but this is a best-effort for raw args string
+          read -ra EXTRA_ARGS <<< "${{ inputs.args }}"
+          ARGS+=("${EXTRA_ARGS[@]}")
         fi
 
         # Ensure git identity is set for commits/tags
@@ -105,7 +119,7 @@ runs:
         # Run foonver with --json to get structured output
         # We also use --release-notes to a temporary file to capture the delta
         TEMP_NOTES=$(mktemp)
-        PLAN_JSON=$(foonver ${{ inputs.command }} $ARGS --json --release-notes "$TEMP_NOTES")
+        PLAN_JSON=$(foonver ${{ inputs.command }} "${ARGS[@]}" --json --release-notes "$TEMP_NOTES")
 
         # Use jq to extract data from the plan
         NEW_VERSION=$(echo "$PLAN_JSON" | jq -r '.next_version')

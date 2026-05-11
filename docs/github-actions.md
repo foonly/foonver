@@ -56,6 +56,7 @@ jobs:
 | `command`        | The foonver command to run (`auto`, `patch`, `minor`, `major`).            | `auto`   |
 | `changelog`      | Whether to update the project's `CHANGELOG.md`.                            | `true`   |
 | `push`           | Whether to push the created commit and tag to the remote.                  | `false`  |
+| `remote`         | Git remote to push to.                                                     | `origin` |
 | `commit_message` | Custom commit message.                                                     | `""`     |
 | `commit_suffix`  | Suffix to append to the commit message (e.g., `[skip ci]`).                | `""`     |
 | `dry_run`        | If `true`, simulates the bump and provides outputs without changing files. | `false`  |

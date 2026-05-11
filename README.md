@@ -13,7 +13,7 @@ Version 0.11.3
 - **Git Integration**:
   - Validates repository state before mutating.
   - Creates dedicated version-bump commits and tags.
-  - Optional automatic pushing of tags and commits.
+  - Optional automatic pushing of tags and commits to a configurable remote.
 - **Changelog Management**: Categorizes commits and automatically updates `CHANGELOG.md`.
   - Automatically filters out version-only commits and those containing `[skip ci]` or `[skip action]`.
 
@@ -77,6 +77,9 @@ foonver patch --commit-suffix "[skip ci]"
 
 # Use a completely custom message
 foonver minor -m "Release: new features for v1.2.0"
+
+# Push to a specific remote
+foonver major --push --remote upstream
 ```
 
 ## Configuration
@@ -95,6 +98,9 @@ push = false
 
 # Prefix for git tags (e.g., v1.0.0)
 prefix = "v"
+
+# Git remote to push to (defaults to origin)
+remote = "origin"
 
 # Output verbosity: quiet, normal, verbose, debug
 verbosity = "normal"
