@@ -95,8 +95,17 @@ func CommitAndTag(filenames []string, version string) error {
 	// Append the prefix to version.
 	versionString := fmt.Sprintf("%s%s", config.Conf.Prefix, version)
 
+	// Determine commit message
+	commitMsg := config.Conf.CommitMessage
+	if commitMsg == "" {
+		commitMsg = versionString
+	}
+	if config.Conf.CommitSuffix != "" {
+		commitMsg = fmt.Sprintf("%s %s", commitMsg, config.Conf.CommitSuffix)
+	}
+
 	// Commit
-	cmd = exec.Command("git", "commit", "-m", versionString)
+	cmd = exec.Command("git", "commit", "-m", commitMsg)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("git commit failed: %w", err)
 	}

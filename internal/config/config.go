@@ -68,18 +68,20 @@ type GitInfo struct {
 }
 
 type Config struct {
-	DryRun       bool     `mapstructure:"dry-run"`
-	Push         bool     `mapstructure:"push"`
-	Prefix       string   `mapstructure:"prefix"`
-	Verbosity    Level    `mapstructure:"verbosity"`
-	Parser       string   `mapstructure:"parser"`
-	Changelog    bool     `mapstructure:"changelog"`
-	File         string   `mapstructure:"file"`
-	VersionSync  []string `mapstructure:"version-sync"`
-	ReleaseNotes string   `mapstructure:"release-notes"`
-	PrintVersion bool     `mapstructure:"print-version"`
-	JSON         bool     `mapstructure:"json"`
-	Info         GitInfo
+	DryRun        bool     `mapstructure:"dry-run"`
+	Push          bool     `mapstructure:"push"`
+	Prefix        string   `mapstructure:"prefix"`
+	Verbosity     Level    `mapstructure:"verbosity"`
+	Parser        string   `mapstructure:"parser"`
+	Changelog     bool     `mapstructure:"changelog"`
+	File          string   `mapstructure:"file"`
+	VersionSync   []string `mapstructure:"version-sync"`
+	ReleaseNotes  string   `mapstructure:"release-notes"`
+	PrintVersion  bool     `mapstructure:"print-version"`
+	JSON          bool     `mapstructure:"json"`
+	CommitMessage string   `mapstructure:"commit-message"`
+	CommitSuffix  string   `mapstructure:"commit-suffix"`
+	Info          GitInfo
 }
 
 var Conf Config
@@ -102,6 +104,8 @@ func Init() {
 	viper.SetDefault("release-notes", "")
 	viper.SetDefault("print-version", false)
 	viper.SetDefault("json", false)
+	viper.SetDefault("commit-message", "")
+	viper.SetDefault("commit-suffix", "")
 
 	// Find and read the config file
 	err := viper.ReadInConfig()
@@ -169,6 +173,14 @@ func processFlags() {
 
 	if viper.IsSet("json") && viper.GetBool("json") {
 		Conf.JSON = true
+	}
+
+	if viper.IsSet("commit-message") {
+		Conf.CommitMessage = viper.GetString("commit-message")
+	}
+
+	if viper.IsSet("commit-suffix") {
+		Conf.CommitSuffix = viper.GetString("commit-suffix")
 	}
 
 	if viper.IsSet("quiet") && viper.GetBool("quiet") {

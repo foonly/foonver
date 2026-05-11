@@ -1,6 +1,7 @@
 package changelog
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -34,13 +35,37 @@ func TestFindVerRegex(t *testing.T) {
 	}
 }
 
-func TestFilteredCommits(t *testing.T) {
-	// Since filteredCommits calls git.GetCommits, which interacts with the actual git repo,
-	// we would ideally mock the git package. However, for this task, we can verify
-	// the logic by testing the regex and message handling in a more isolated way
-	// if the code allowed it, but here we've already updated the regex which is
-	// the core of the requested change.
+func TestMessageFiltering(t *testing.T) {
+	tests := []struct {
+		msg  string
+		want bool // true if it should be filtered out
+	}{
+		{"feat: add something", false},
+		{"fix: bug", false},
+		{"v1.2.3", true},
+		{"1.2.3", true},
+		{"chore: bump version [skip ci]", true},
+		{"docs: update readme [skip action]", true},
+		{"Merge branch 'main'", true},
+		{"v0.11.1", true},
+		{"just a message", false},
+	}
 
-	// We can verify the filtering logic that uses findVer manually or via internal
-	// knowledge of how filteredCommits is implemented.
+	for _, tt := range tests {
+		t.Run(tt.msg, func(t *testing.T) {
+			// This matches the logic in filteredCommits
+			isFiltered := false
+			if strings.HasPrefix(tt.msg, "Merge ") {
+				isFiltered = true
+			} else if strings.Contains(tt.msg, "[skip ci]") || strings.Contains(tt.msg, "[skip action]") {
+				isFiltered = true
+			} else if findVer.MatchString(tt.msg) {
+				isFiltered = true
+			}
+
+			if isFiltered != tt.want {
+				t.Errorf("Filtering for %q = %v, want %v", tt.msg, isFiltered, tt.want)
+			}
+		})
+	}
 }

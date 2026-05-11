@@ -15,6 +15,7 @@ Version 0.11.2
   - Creates dedicated version-bump commits and tags.
   - Optional automatic pushing of tags and commits.
 - **Changelog Management**: Categorizes commits and automatically updates `CHANGELOG.md`.
+  - Automatically filters out version-only commits and those containing `[skip ci]` or `[skip action]`.
 
 ## Installation
 
@@ -66,6 +67,18 @@ Use the `--dry-run` flag to see the calculated version and the list of commits b
 foonver auto --dry-run
 ```
 
+### Custom Commit Messages
+
+Customize the version bump commit message or append a suffix:
+
+```bash
+# Append a suffix (e.g., to skip CI)
+foonver patch --commit-suffix "[skip ci]"
+
+# Use a completely custom message
+foonver minor -m "Release: new features for v1.2.0"
+```
+
 ## Configuration
 
 Foonver looks for a `foonver.toml`, `foonver.yaml`, or `foonver.json` file in the following locations (in order):
@@ -88,6 +101,12 @@ verbosity = "normal"
 
 # Commit parser: angular, generic, or all
 parser = "all"
+
+# Custom commit message (defaults to version string)
+commit-message = ""
+
+# Suffix to append to the commit message (e.g., "[skip ci]")
+commit-suffix = ""
 
 # Automatically update the changelog file
 changelog = true

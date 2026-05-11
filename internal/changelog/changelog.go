@@ -249,6 +249,10 @@ func filteredCommits(revRange string, tag string) ([]string, error) {
 			continue
 		}
 
+		if strings.Contains(msg, "[skip ci]") || strings.Contains(msg, "[skip action]") {
+			continue
+		}
+
 		if findVer.MatchString(msg) {
 			continue
 		}

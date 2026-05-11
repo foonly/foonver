@@ -17,6 +17,14 @@ inputs:
     description: "Whether to push the created commit and tag"
     required: false
     default: "false"
+  commit_message:
+    description: "Custom commit message"
+    required: false
+    default: ""
+  commit_suffix:
+    description: "Suffix to append to the commit message (e.g., [skip ci])"
+    required: false
+    default: ""
   dry_run:
     description: "Run in dry-run mode (outputs version without making changes)"
     required: false
@@ -70,6 +78,14 @@ runs:
           ARGS="--push $ARGS"
         else
           ARGS="--no-push $ARGS"
+        fi
+
+        if [ -n "${{ inputs.commit_message }}" ]; then
+          ARGS="--commit-message \"${{ inputs.commit_message }}\" $ARGS"
+        fi
+
+        if [ -n "${{ inputs.commit_suffix }}" ]; then
+          ARGS="--commit-suffix \"${{ inputs.commit_suffix }}\" $ARGS"
         fi
 
         if [ "${{ inputs.dry_run }}" == "true" ]; then
