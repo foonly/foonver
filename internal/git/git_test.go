@@ -118,6 +118,42 @@ func TestCommitAndTag_WithChanges(t *testing.T) {
 	}
 }
 
+func TestCommitAndTag_DoublePrefix(t *testing.T) {
+	dir := setupTestRepo(t)
+	defer os.RemoveAll(dir)
+
+	oldRoot := config.Conf.Info.RootDir
+	oldCwd, _ := os.Getwd()
+	config.Conf.Info.RootDir = dir
+	config.Conf.Prefix = "v"
+	os.Chdir(dir)
+	defer func() {
+		config.Conf.Info.RootDir = oldRoot
+		os.Chdir(oldCwd)
+	}()
+
+	// version already has the prefix
+	version := "v1.2.0"
+	err := CommitAndTag([]string{}, version)
+	if err != nil {
+		t.Fatalf("CommitAndTag failed: %v", err)
+	}
+
+	// Verify tag is NOT "vv1.2.0"
+	out, err := runGit("tag", "-l", "v1.2.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(out) != "v1.2.0" {
+		t.Errorf("Expected tag v1.2.0, got: %s", out)
+	}
+
+	out, err = runGit("tag", "-l", "vv1.2.0")
+	if err == nil && strings.Contains(out, "vv1.2.0") {
+		t.Errorf("Tag vv1.2.0 should not exist")
+	}
+}
+
 func TestExitCode(t *testing.T) {
 	// Note: We can't easily test the actual exit code value without a real process,
 	// but we can verify the Unwrap logic works.

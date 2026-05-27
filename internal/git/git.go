@@ -124,8 +124,11 @@ func CommitAndTag(filenames []string, version string) error {
 		}
 	}
 
-	// Append the prefix to version.
-	versionString := fmt.Sprintf("%s%s", config.Conf.Prefix, version)
+	// Append the prefix to version if it's not already there.
+	versionString := version
+	if config.Conf.Prefix != "" && !strings.HasPrefix(version, config.Conf.Prefix) {
+		versionString = fmt.Sprintf("%s%s", config.Conf.Prefix, version)
+	}
 
 	// Determine commit message
 	commitMsg := config.Conf.CommitMessage
