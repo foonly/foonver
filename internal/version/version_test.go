@@ -2,6 +2,9 @@ package version
 
 import (
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Masterminds/semver/v3"
@@ -415,4 +418,75 @@ func TestUpdateVersionFile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDiscoverVersion_Fallback(t *testing.T) {
+	// Mock git repository
+	dir, err := os.MkdirTemp("", "foonver-discover-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	runGit := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %s failed: %v\nOutput: %s", strings.Join(args, " "), err, string(out))
+		}
+	}
+
+	runGit("init")
+	runGit("config", "user.email", "test@example.com")
+	runGit("config", "user.name", "Test User")
+	runGit("commit", "--allow-empty", "-m", "initial")
+	runGit("tag", "v1.2.3")
+
+	// Set root dir to temp dir
+	oldRoot := config.Conf.Info.RootDir
+	config.Conf.Info.RootDir = dir
+	oldCwd, _ := os.Getwd()
+	os.Chdir(dir)
+	defer func() {
+		config.Conf.Info.RootDir = oldRoot
+		os.Chdir(oldCwd)
+	}()
+
+	t.Run("fallback to tag", func(t *testing.T) {
+		path, v, content, err := discoverVersion()
+		if err != nil {
+			t.Fatalf("discoverVersion() failed: %v", err)
+		}
+		if path != "" {
+			t.Errorf("expected empty path, got %s", path)
+		}
+		if v.String() != "1.2.3" {
+			t.Errorf("expected version 1.2.3, got %s", v.String())
+		}
+		if v.Original() != "v1.2.3" {
+			t.Errorf("expected original version v1.2.3, got %s", v.Original())
+		}
+		if content != nil {
+			t.Errorf("expected nil content")
+		}
+	})
+
+	t.Run("prefers file over tag", func(t *testing.T) {
+		err := os.WriteFile(filepath.Join(dir, "version.json"), []byte(`{"version": "2.0.0"}`), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(filepath.Join(dir, "version.json"))
+
+		path, v, _, err := discoverVersion()
+		if err != nil {
+			t.Fatalf("discoverVersion() failed: %v", err)
+		}
+		if !strings.HasSuffix(path, "version.json") {
+			t.Errorf("expected version.json, got %s", path)
+		}
+		if v.String() != "2.0.0" {
+			t.Errorf("expected version 2.0.0, got %s", v.String())
+		}
+	})
 }

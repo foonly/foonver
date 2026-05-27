@@ -11,20 +11,58 @@ import (
 )
 
 func runGit(args ...string) (string, error) {
+	return runGitWithCode(args...)
+}
+
+func runGitWithCode(args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
+	err := cmd.Run()
+	if err != nil {
 		msg := strings.TrimSpace(stderr.String())
 		if msg == "" {
 			msg = err.Error()
 		}
-		return "", fmt.Errorf("git %s: %s", strings.Join(args, " "), msg)
+		// Return the original err as the cause so ExitCode can inspect it
+		return "", &GitError{Args: args, Message: msg, Err: err}
 	}
 
 	return stdout.String(), nil
+}
+
+type GitError struct {
+	Args    []string
+	Message string
+	Err     error
+}
+
+func (e *GitError) Error() string {
+	return fmt.Sprintf("git %s: %s", strings.Join(e.Args, " "), e.Message)
+}
+
+func (e *GitError) Unwrap() error {
+	return e.Err
+}
+
+// ExitCode returns the exit code of a git command error, if available.
+func ExitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		return exitErr.ExitCode()
+	}
+	// Many of our errors are wrapped with fmt.Errorf, so we need to check the cause
+	type causer interface {
+		Unwrap() error
+	}
+	if c, ok := err.(causer); ok {
+		return ExitCode(c.Unwrap())
+	}
+	return -1
 }
 
 // EnsureRepo checks if the current directory is a Git repository and populates config.Conf.Info.
@@ -99,13 +137,23 @@ func CommitAndTag(filenames []string, version string) error {
 	}
 
 	// Commit only if there are staged changes
-	// git diff --cached --quiet returns 1 if there are staged changes, 0 otherwise.
+	// git diff --cached --quiet returns 1 if there are staged changes, 0 if none.
 	_, err := runGit("diff", "--cached", "--quiet")
 	if err != nil {
-		// If there's an error, it usually means there are staged changes (exit code 1)
-		// but it could be a real error. We'll try to commit anyway and see what happens.
-		if _, err := runGit("commit", "-m", commitMsg); err != nil {
+		code := ExitCode(err)
+		if code == 1 {
+			// There are staged changes, proceed with commit
+			if _, err := runGit("commit", "-m", commitMsg); err != nil {
+				return err
+			}
+		} else {
+			// A real error occurred (code != 1 and err != nil)
 			return err
+		}
+	} else {
+		// err == nil means code == 0, so no staged changes.
+		if config.Conf.Verbosity >= config.Normal {
+			fmt.Printf("No changes to commit for %s\n", versionString)
 		}
 	}
 
