@@ -70,9 +70,12 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 	if !quiet {
 		if plan.VersionFile != "" {
 			fmt.Printf("Found version %s in %s\n", plan.CurrentVersion.Original(), plan.VersionFile)
-		} else {
+		} else if plan.LastTag != "" {
 			fmt.Printf("Found version %s from latest tag\n", plan.CurrentVersion.Original())
+		} else {
+			fmt.Printf("No version source found, starting from 0.0.0\n")
 		}
+
 		if plan.LastTag != "" && plan.VersionFile != "" {
 			fmt.Printf("Last version tag: %s\n", plan.LastTag)
 		}
@@ -309,7 +312,10 @@ func discoverVersion() (string, *semver.Version, []byte, error) {
 		}
 	}
 
-	return "", nil, nil, fmt.Errorf("no valid version file found and no valid semver tag exists")
+	// Fallback 2: Default to 0.0.0 if neither file nor tag is found.
+	// This allows foonver to work on brand new projects.
+	v, _ := semver.NewVersion("0.0.0")
+	return "", v, nil, nil
 }
 
 // ExtractVersion extracts a version string from the given file content based on the filename's extension.

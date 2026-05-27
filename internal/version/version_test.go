@@ -489,4 +489,43 @@ func TestDiscoverVersion_Fallback(t *testing.T) {
 			t.Errorf("expected version 2.0.0, got %s", v.String())
 		}
 	})
+
+	t.Run("defaults to 0.0.0 when nothing found", func(t *testing.T) {
+		// Create a fresh empty repo
+		emptyDir, err := os.MkdirTemp("", "foonver-empty-test-*")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(emptyDir)
+
+		runGit := func(args ...string) {
+			cmd := exec.Command("git", args...)
+			cmd.Dir = emptyDir
+			cmd.Run()
+		}
+		runGit("init")
+
+		oldRoot := config.Conf.Info.RootDir
+		config.Conf.Info.RootDir = emptyDir
+		oldCwd, _ := os.Getwd()
+		os.Chdir(emptyDir)
+		defer func() {
+			config.Conf.Info.RootDir = oldRoot
+			os.Chdir(oldCwd)
+		}()
+
+		path, v, content, err := discoverVersion()
+		if err != nil {
+			t.Fatalf("discoverVersion() failed: %v", err)
+		}
+		if path != "" {
+			t.Errorf("expected empty path")
+		}
+		if v.String() != "0.0.0" {
+			t.Errorf("expected 0.0.0, got %s", v.String())
+		}
+		if content != nil {
+			t.Errorf("expected nil content")
+		}
+	})
 }
