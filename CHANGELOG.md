@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.13.0 (2026-05-11)
+### 0.13.1 (2026-05-27)
+
+#### Bug Fixes
+
+- git: improve commit staging logic and error handling (258765c)
+- version: remove prefix stripping when parsing latest git tag (889744c)
+- version: support tag-based versioning without a version file (ecf7e7b)
+
+## v0.13.0 (2026-05-11)
 
 #### Features
 
