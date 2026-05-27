@@ -1,6 +1,13 @@
 # Changelog
 
-### 0.13.1 (2026-05-27)
+### 0.13.2 (2026-05-27)
+
+#### Bug Fixes
+
+- version: default to 0.0.0 when no version source is found (abd0f2f)
+- git: prevent double prefixing of version tags (4fcf8e6)
+
+### v0.13.1 (2026-05-27)
 
 #### Bug Fixes
 
