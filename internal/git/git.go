@@ -98,9 +98,15 @@ func CommitAndTag(filenames []string, version string) error {
 		commitMsg = fmt.Sprintf("%s %s", commitMsg, config.Conf.CommitSuffix)
 	}
 
-	// Commit
-	if _, err := runGit("commit", "-m", commitMsg); err != nil {
-		return err
+	// Commit only if there are staged changes
+	// git diff --cached --quiet returns 1 if there are staged changes, 0 otherwise.
+	_, err := runGit("diff", "--cached", "--quiet")
+	if err != nil {
+		// If there's an error, it usually means there are staged changes (exit code 1)
+		// but it could be a real error. We'll try to commit anyway and see what happens.
+		if _, err := runGit("commit", "-m", commitMsg); err != nil {
+			return err
+		}
 	}
 
 	// Tag

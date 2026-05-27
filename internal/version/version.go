@@ -68,8 +68,12 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 	quiet := config.Conf.PrintVersion || config.Conf.JSON
 
 	if !quiet {
-		fmt.Printf("Found version %s in %s\n", plan.CurrentVersion.Original(), plan.VersionFile)
-		if plan.LastTag != "" {
+		if plan.VersionFile != "" {
+			fmt.Printf("Found version %s in %s\n", plan.CurrentVersion.Original(), plan.VersionFile)
+		} else {
+			fmt.Printf("Found version %s from latest tag\n", plan.CurrentVersion.Original())
+		}
+		if plan.LastTag != "" && plan.VersionFile != "" {
 			fmt.Printf("Last version tag: %s\n", plan.LastTag)
 		}
 
@@ -185,14 +189,16 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 		return plan, nil
 	}
 
-	// 1. Update version file
-	plan.Steps = append(plan.Steps, PlanStep{
-		Type:        StepUpdateVersionFile,
-		Description: fmt.Sprintf("Update %s: %s -> %s", fileName, currentVersion.Original(), nextVersionStr),
-		Action: func() error {
-			return updateVersionFile(fileName, currentVersion.Original(), nextVersionStr, fileContent)
-		},
-	})
+	// 1. Update version file (only if it exists)
+	if fileName != "" {
+		plan.Steps = append(plan.Steps, PlanStep{
+			Type:        StepUpdateVersionFile,
+			Description: fmt.Sprintf("Update %s: %s -> %s", fileName, currentVersion.Original(), nextVersionStr),
+			Action: func() error {
+				return updateVersionFile(fileName, currentVersion.Original(), nextVersionStr, fileContent)
+			},
+		})
+	}
 
 	// 2. Version Sync
 	for _, syncFile := range config.Conf.VersionSync {
@@ -237,7 +243,10 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 		Type:        StepGitCommit,
 		Description: fmt.Sprintf("Git commit and tag: %s", nextVersionStr),
 		Action: func() error {
-			files := []string{fileName}
+			files := []string{}
+			if fileName != "" {
+				files = append(files, fileName)
+			}
 			for _, syncFile := range config.Conf.VersionSync {
 				files = append(files, path.Join(config.Conf.Info.RootDir, syncFile))
 			}
@@ -291,7 +300,24 @@ func discoverVersion() (string, *semver.Version, []byte, error) {
 		return filePath, v, content, nil
 	}
 
-	return "", nil, nil, fmt.Errorf("no valid version file found")
+	// Fallback: Try to get version from latest Git tag
+	latestTag, err := git.GetLatestTag()
+	if err == nil && latestTag != "" {
+		vStr := latestTag
+		// If the tag starts with the configured prefix, strip it for parsing
+		// but we'll use the original for the current version string if it's semver compatible
+		if config.Conf.Prefix != "" && strings.HasPrefix(vStr, config.Conf.Prefix) {
+			vStr = strings.TrimPrefix(vStr, config.Conf.Prefix)
+		}
+
+		v, err := semver.NewVersion(vStr)
+		if err == nil {
+			// Use the stripped version so that BuildPlan can decide on prefixes
+			return "", v, nil, nil
+		}
+	}
+
+	return "", nil, nil, fmt.Errorf("no valid version file found and no valid semver tag exists")
 }
 
 // ExtractVersion extracts a version string from the given file content based on the filename's extension.
