@@ -303,16 +303,8 @@ func discoverVersion() (string, *semver.Version, []byte, error) {
 	// Fallback: Try to get version from latest Git tag
 	latestTag, err := git.GetLatestTag()
 	if err == nil && latestTag != "" {
-		vStr := latestTag
-		// If the tag starts with the configured prefix, strip it for parsing
-		// but we'll use the original for the current version string if it's semver compatible
-		if config.Conf.Prefix != "" && strings.HasPrefix(vStr, config.Conf.Prefix) {
-			vStr = strings.TrimPrefix(vStr, config.Conf.Prefix)
-		}
-
-		v, err := semver.NewVersion(vStr)
+		v, err := semver.NewVersion(latestTag)
 		if err == nil {
-			// Use the stripped version so that BuildPlan can decide on prefixes
 			return "", v, nil, nil
 		}
 	}
