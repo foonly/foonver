@@ -1,6 +1,12 @@
 # Changelog
 
-### 0.13.2 (2026-05-27)
+### 0.13.3 (2026-06-01)
+
+#### Bug Fixes
+
+- action: handle foonver execution errors correctly (f266cd9)
+
+### v0.13.2 (2026-05-27)
 
 #### Bug Fixes
 
