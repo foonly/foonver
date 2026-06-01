@@ -3,9 +3,13 @@
 package main
 
 import (
+	"os"
+
 	"github.com/foonly/foonver/internal/commands"
 )
 
 func main() {
-	commands.Execute()
+	if err := commands.Execute(); err != nil {
+		os.Exit(1)
+	}
 }

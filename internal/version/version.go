@@ -60,8 +60,7 @@ var versionFiles = []string{
 func RunVersion(cmd *cobra.Command, args []string) error {
 	plan, err := BuildPlan(cmd, args)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	nextVersionStr := plan.NextVersionStr
@@ -122,8 +121,7 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 	}
 
 	if plan.IsDirty {
-		fmt.Fprintf(os.Stderr, "Error: Git working directory not clean. Commit or stash changes first.\n")
-		os.Exit(1)
+		return fmt.Errorf("Git working directory not clean. Commit or stash changes first")
 	}
 
 	for _, step := range plan.Steps {

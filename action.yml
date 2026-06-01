@@ -120,6 +120,12 @@ runs:
         # We also use --release-notes to a temporary file to capture the delta
         TEMP_NOTES=$(mktemp)
         PLAN_JSON=$(foonver ${{ inputs.command }} "${ARGS[@]}" --json --release-notes "$TEMP_NOTES")
+        FOONVER_EXIT_CODE=$?
+
+        if [ $FOONVER_EXIT_CODE -ne 0 ]; then
+          echo "Error: foonver failed with exit code $FOONVER_EXIT_CODE"
+          exit $FOONVER_EXIT_CODE
+        fi
 
         # Use jq to extract data from the plan
         NEW_VERSION=$(echo "$PLAN_JSON" | jq -r '.next_version')
