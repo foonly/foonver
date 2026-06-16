@@ -595,11 +595,11 @@ func syncVersion(filename, oldVersion, newVersion string) error {
 
 	// Regex explained:
 	// (?i)         : Case-insensitive
-	// (version|v)  : Match "version" or "v"
+	// (version|v|ver|stable tag) : Match "version", "v", "ver", or "stable tag"
 	// [[:punct:]\s]* : Optional punctuation or whitespace
 	// (%s)         : The old version string (quoted/escaped)
 	quotedOld := regexp.QuoteMeta(oldVersion)
-	reStr := fmt.Sprintf(`(?i)(version|v)[[:punct:]\s]*(%s)`, quotedOld)
+	reStr := fmt.Sprintf(`(?i)(version|v|ver|stable tag)[[:punct:]\s]*(%s)`, quotedOld)
 	re, err := regexp.Compile(reStr)
 	if err != nil {
 		return fmt.Errorf("failed to compile sync regex: %w", err)
