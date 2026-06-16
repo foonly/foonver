@@ -69,6 +69,27 @@ func TestExtractVersion(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name:     "version.yaml valid",
+			filename: "version.yaml",
+			content:  "version: 1.2.3\n",
+			want:     "1.2.3",
+			wantErr:  false,
+		},
+		{
+			name:     "version.yml valid",
+			filename: "version.yml",
+			content:  "version: '2.0.0'\n",
+			want:     "2.0.0",
+			wantErr:  false,
+		},
+		{
+			name:     "composer.json valid",
+			filename: "composer.json",
+			content:  `{"name": "test/project", "version": "1.0.0-alpha"}`,
+			want:     "1.0.0-alpha",
+			wantErr:  false,
+		},
+		{
 			name:     "unsupported file",
 			filename: "version.xml",
 			content:  "<version>1.0.0</version>",
@@ -391,6 +412,24 @@ func TestUpdateVersionFile(t *testing.T) {
 			want:       "v1.3.0\n",
 			wantErr:    false,
 		},
+		{
+			name:       "yaml update double quotes",
+			filename:   "version.yaml",
+			content:    "version: \"1.2.3\"\n",
+			oldVersion: "1.2.3",
+			newVersion: "1.2.4",
+			want:       "version: \"1.2.4\"\n",
+			wantErr:    false,
+		},
+		{
+			name:       "yaml update single quotes",
+			filename:   "version.yaml",
+			content:    "version: '1.2.3'\n",
+			oldVersion: "1.2.3",
+			newVersion: "1.2.4",
+			want:       "version: '1.2.4'\n",
+			wantErr:    false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -487,6 +526,35 @@ func TestDiscoverVersion_Fallback(t *testing.T) {
 		}
 		if v.String() != "2.0.0" {
 			t.Errorf("expected version 2.0.0, got %s", v.String())
+		}
+	})
+
+	t.Run("uses specified version file", func(t *testing.T) {
+		err := os.WriteFile(filepath.Join(dir, "custom.json"), []byte(`{"version": "3.0.0"}`), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(filepath.Join(dir, "custom.json"))
+
+		// Precedence check: also create a standard version file
+		err = os.WriteFile(filepath.Join(dir, "version.json"), []byte(`{"version": "2.0.0"}`), 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(filepath.Join(dir, "version.json"))
+
+		config.Conf.VersionFile = "custom.json"
+		defer func() { config.Conf.VersionFile = "" }()
+
+		path, v, _, err := discoverVersion()
+		if err != nil {
+			t.Fatalf("discoverVersion() failed: %v", err)
+		}
+		if !strings.HasSuffix(path, "custom.json") {
+			t.Errorf("expected custom.json, got %s", path)
+		}
+		if v.String() != "3.0.0" {
+			t.Errorf("expected version 3.0.0, got %s", v.String())
 		}
 	})
 

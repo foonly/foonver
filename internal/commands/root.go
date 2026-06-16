@@ -23,6 +23,7 @@ var (
 	flagRemote       string
 	flagCommitMsg    string
 	flagCommitSuffix string
+	flagVersionFile  string
 )
 
 var rootCmd = &cobra.Command{
@@ -56,6 +57,7 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceVar(&flagSync, "sync", []string{}, "files to synchronize version in")
 	rootCmd.PersistentFlags().StringVarP(&flagCommitMsg, "commit-message", "m", "", "custom commit message")
 	rootCmd.PersistentFlags().StringVar(&flagCommitSuffix, "commit-suffix", "", "suffix to append to the commit message")
+	rootCmd.PersistentFlags().StringVar(&flagVersionFile, "version-file", "", "explicitly specify the version file")
 
 	rootCmd.MarkFlagsMutuallyExclusive("quiet", "normal", "verbose", "debug")
 	rootCmd.MarkFlagsMutuallyExclusive("push", "no-push")
@@ -75,6 +77,7 @@ func init() {
 	viper.BindPFlag("version-sync", rootCmd.PersistentFlags().Lookup("sync"))
 	viper.BindPFlag("commit-message", rootCmd.PersistentFlags().Lookup("commit-message"))
 	viper.BindPFlag("commit-suffix", rootCmd.PersistentFlags().Lookup("commit-suffix"))
+	viper.BindPFlag("version-file", rootCmd.PersistentFlags().Lookup("version-file"))
 
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }

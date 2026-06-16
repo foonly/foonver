@@ -82,6 +82,7 @@ type Config struct {
 	JSON          bool     `mapstructure:"json"`
 	CommitMessage string   `mapstructure:"commit-message"`
 	CommitSuffix  string   `mapstructure:"commit-suffix"`
+	VersionFile   string   `mapstructure:"version-file"`
 	Info          GitInfo
 }
 
@@ -108,6 +109,7 @@ func Init() {
 	viper.SetDefault("json", false)
 	viper.SetDefault("commit-message", "")
 	viper.SetDefault("commit-suffix", "")
+	viper.SetDefault("version-file", "")
 
 	// Find and read the config file
 	err := viper.ReadInConfig()
@@ -187,6 +189,10 @@ func processFlags() {
 
 	if viper.IsSet("commit-suffix") {
 		Conf.CommitSuffix = viper.GetString("commit-suffix")
+	}
+
+	if viper.IsSet("version-file") {
+		Conf.VersionFile = viper.GetString("version-file")
 	}
 
 	if viper.IsSet("quiet") && viper.GetBool("quiet") {

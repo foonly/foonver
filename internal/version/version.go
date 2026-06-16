@@ -17,6 +17,7 @@ import (
 	"github.com/foonly/foonver/internal/config"
 	"github.com/foonly/foonver/internal/git"
 	"github.com/spf13/cobra"
+	"go.yaml.in/yaml/v3"
 )
 
 type StepType string
@@ -50,11 +51,14 @@ type ExecutionPlan struct {
 }
 
 var versionFiles = []string{
-	"package.json",
 	"version.json",
 	"version.toml",
+	"version.yaml",
+	"version.yml",
 	"version.txt",
 	"version.md",
+	"package.json",
+	"composer.json",
 }
 
 func RunVersion(cmd *cobra.Command, args []string) error {
@@ -278,6 +282,26 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 // discoverVersion searches for a version file in the current directory and returns its path,
 // the parsed version, and its raw content.
 func discoverVersion() (string, *semver.Version, []byte, error) {
+	if config.Conf.VersionFile != "" {
+		filePath := path.Join(config.Conf.Info.RootDir, config.Conf.VersionFile)
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			return "", nil, nil, fmt.Errorf("error reading specified version file %s: %w", config.Conf.VersionFile, err)
+		}
+
+		vStr, err := extractVersion(config.Conf.VersionFile, content)
+		if err != nil {
+			return "", nil, nil, fmt.Errorf("error extracting version from %s: %w", config.Conf.VersionFile, err)
+		}
+
+		v, err := semver.NewVersion(vStr)
+		if err != nil {
+			return "", nil, nil, fmt.Errorf("invalid semver string '%s' in %s: %w", vStr, config.Conf.VersionFile, err)
+		}
+
+		return filePath, v, content, nil
+	}
+
 	for _, file := range versionFiles {
 		filePath := path.Join(config.Conf.Info.RootDir, file)
 		content, err := os.ReadFile(filePath)
@@ -323,6 +347,16 @@ func extractVersion(filename string, content []byte) (string, error) {
 	case strings.HasSuffix(filename, ".json"):
 		var data map[string]any
 		if err := json.Unmarshal(content, &data); err != nil {
+			return "", err
+		}
+		if v, ok := data["version"].(string); ok {
+			return v, nil
+		}
+		return "", fmt.Errorf("no 'version' string field found")
+
+	case strings.HasSuffix(filename, ".yaml"), strings.HasSuffix(filename, ".yml"):
+		var data map[string]any
+		if err := yaml.Unmarshal(content, &data); err != nil {
 			return "", err
 		}
 		if v, ok := data["version"].(string); ok {
@@ -525,15 +559,15 @@ func updateVersionFile(filename, oldVersion, newVersion string, content []byte) 
 	var newContent []byte
 
 	switch {
-	case strings.HasSuffix(filename, ".json"), strings.HasSuffix(filename, ".toml"):
-		// Simple string replacement for JSON and TOML to preserve formatting.
+	case strings.HasSuffix(filename, ".json"), strings.HasSuffix(filename, ".toml"), strings.HasSuffix(filename, ".yaml"), strings.HasSuffix(filename, ".yml"):
+		// Simple string replacement for JSON, TOML and YAML to preserve formatting.
 		// A more robust approach would use an AST, but this works for basic cases.
 		oldStr := fmt.Sprintf(`"%s"`, oldVersion)
 		newStr := fmt.Sprintf(`"%s"`, newVersion)
 		newContent = bytes.Replace(content, []byte(oldStr), []byte(newStr), 1)
 
-		// TOML might use single quotes
-		if bytes.Equal(content, newContent) && strings.HasSuffix(filename, ".toml") {
+		// TOML/YAML might use single quotes
+		if bytes.Equal(content, newContent) && (strings.HasSuffix(filename, ".toml") || strings.HasSuffix(filename, ".yaml") || strings.HasSuffix(filename, ".yml")) {
 			oldStr := fmt.Sprintf(`'%s'`, oldVersion)
 			newStr := fmt.Sprintf(`'%s'`, newVersion)
 			newContent = bytes.Replace(content, []byte(oldStr), []byte(newStr), 1)

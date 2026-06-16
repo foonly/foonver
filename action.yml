@@ -29,6 +29,9 @@ inputs:
     description: "Suffix to append to the commit message (e.g., [skip ci])"
     required: false
     default: ""
+  version_file:
+    description: "Explicitly specify the version file (e.g., config/project.json)"
+    required: false
   dry_run:
     description: "Run in dry-run mode (outputs version without making changes)"
     required: false
@@ -94,6 +97,10 @@ runs:
 
         if [ -n "${{ inputs.commit_suffix }}" ]; then
           ARGS+=("--commit-suffix" "${{ inputs.commit_suffix }}")
+        fi
+
+        if [ -n "${{ inputs.version_file }}" ]; then
+          ARGS+=("--version-file" "${{ inputs.version_file }}")
         fi
 
         if [ "${{ inputs.dry_run }}" == "true" ]; then

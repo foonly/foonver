@@ -8,7 +8,8 @@ Version 0.13.3
 
 - **Plan-First Workflow**: Preview exactly what will happen before any files are changed.
 - **Automated Versioning**: Intelligently determines the next version by analyzing Git commit history since the last tag.
-- **Multi-format Support**: Discovers and updates version strings in `package.json`, `version.json`, `version.toml`, `version.txt`, and `version.md`.
+- **Multi-format Support**: Discovers and updates version strings in `version.json`, `version.toml`, `version.yaml`, `version.txt`, `version.md`, `package.json`, and `composer.json`.
+- **Custom Version Files**: Explicitly specify any JSON, TOML, or YAML file to use as the source of truth for the project version.
 - **Version Synchronization**: Update version mentions in arbitrary files (like READMEs or documentation) automatically.
 - **Git Integration**:
   - Validates repository state before mutating.
@@ -78,6 +79,9 @@ foonver patch --commit-suffix "[skip ci]"
 # Use a completely custom message
 foonver minor -m "Release: new features for v1.2.0"
 
+# Use a non-standard version file
+foonver patch --version-file "config/project.json"
+
 # Push to a specific remote
 foonver major --push --remote upstream
 ```
@@ -114,6 +118,9 @@ commit-message = ""
 # Suffix to append to the commit message (e.g., "[skip ci]")
 commit-suffix = ""
 
+# Explicitly specify the version file
+version-file = "version.json"
+
 # Automatically update the changelog file
 changelog = true
 
@@ -128,11 +135,15 @@ version-sync = ["README.md", "docs/install.md"]
 
 The tool scans the project root for files in this order:
 
-1. `package.json`
-2. `version.json`
-3. `version.toml`
+1. `version.json`
+2. `version.toml`
+3. `version.yaml`
 4. `version.txt`
 5. `version.md`
+6. `package.json`
+7. `composer.json`
+
+If a `--version-file` is explicitly provided, automatic discovery is skipped. The file must be a valid `.json`, `.toml`, or `.yaml` file containing a `version` field in the root object, or a `.txt` or `.md` file containing the version string.
 
 ## Development
 
