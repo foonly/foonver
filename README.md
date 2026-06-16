@@ -127,7 +127,7 @@ changelog = true
 # The name of the changelog file
 file = "CHANGELOG.md"
 
-# Synchronize version in other files (finds first mention with "version" or "v" prefix)
+# Synchronize version in other files (finds first mention with "version", "v", "ver", or "stable tag" prefix)
 version-sync = ["README.md", "docs/install.md"]
 ```
 
@@ -144,6 +144,8 @@ The tool scans the project root for files in this order:
 7. `composer.json`
 
 If a `--version-file` is explicitly provided, automatic discovery is skipped. The file must be a valid `.json`, `.toml`, or `.yaml` file containing a `version` field in the root object, or a `.txt` or `.md` file containing the version string.
+
+When using `version-sync`, the tool searches for the version string preceded by `version`, `v`, `ver`, or `stable tag` (case-insensitive). This is particularly useful for maintaining `README.md` files or WordPress `readme.txt` files.
 
 ## Development
 
