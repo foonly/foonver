@@ -1,6 +1,21 @@
 # Changelog
 
-### 0.13.3 (2026-06-01)
+## 0.14.0 (2026-06-17)
+
+#### Features
+
+- version: support ver and stable tag in syncVersion (04f6e20)
+- version: support custom version files and YAML format (4fdc504)
+
+#### Bug Fixes
+
+- git: improve dirty status reporting with file list (a11d978)
+
+#### Documentation
+
+- README: clarify version-sync matching patterns and usage (ed01412)
+
+### v0.13.3 (2026-06-01)
 
 #### Bug Fixes
 
