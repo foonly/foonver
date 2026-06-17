@@ -125,6 +125,10 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 	}
 
 	if plan.IsDirty {
+		dirtyFiles := git.GetDirtyFiles()
+		if len(dirtyFiles) > 0 {
+			return fmt.Errorf("Git working directory not clean. Uncommitted changes in: %s", strings.Join(dirtyFiles, ", "))
+		}
 		return fmt.Errorf("Git working directory not clean. Commit or stash changes first")
 	}
 

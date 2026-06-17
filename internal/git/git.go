@@ -94,14 +94,30 @@ func EnsureRepo() error {
 	return nil
 }
 
-// IsClean checks for uncommitted changes in the working directory and updates config.Conf.Info.
+// IsClean checks for uncommitted changes in tracked files and updates config.Conf.Info.
 func IsClean() bool {
-	output, err := runGit("status", "--porcelain")
+	output, err := runGit("status", "--porcelain", "--untracked-files=no")
 	if err != nil {
 		return false
 	}
 	config.Conf.Info.Clean = len(strings.TrimSpace(output)) == 0
 	return config.Conf.Info.Clean
+}
+
+// GetDirtyFiles returns a list of tracked files with uncommitted changes.
+func GetDirtyFiles() []string {
+	output, err := runGit("status", "--porcelain", "--untracked-files=no")
+	if err != nil {
+		return nil
+	}
+	lines := splitNonEmptyLines(output)
+	files := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if len(line) > 3 {
+			files = append(files, line[3:])
+		}
+	}
+	return files
 }
 
 // RunPreflightChecks ensures the current directory is a Git repository and has no uncommitted changes.
@@ -110,6 +126,10 @@ func RunPreflightChecks() error {
 		return err
 	}
 	if !IsClean() {
+		dirtyFiles := GetDirtyFiles()
+		if len(dirtyFiles) > 0 {
+			return fmt.Errorf("Git working directory not clean. Uncommitted changes in: %s", strings.Join(dirtyFiles, ", "))
+		}
 		return fmt.Errorf("Git working directory not clean. Commit or stash changes first")
 	}
 	return nil
