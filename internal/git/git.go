@@ -110,11 +110,20 @@ func GetDirtyFiles() []string {
 	if err != nil {
 		return nil
 	}
-	lines := splitNonEmptyLines(output)
-	files := make([]string, 0, len(lines))
-	for _, line := range lines {
-		if len(line) > 3 {
-			files = append(files, line[3:])
+	raw := strings.Split(strings.ReplaceAll(output, "\r\n", "\n"), "\n")
+	files := make([]string, 0, len(raw))
+	for _, line := range raw {
+		if len(line) <= 3 {
+			continue
+		}
+		filePath := strings.TrimSpace(line[3:])
+		if strings.Contains(filePath, " -> ") {
+			parts := strings.Split(filePath, " -> ")
+			filePath = parts[len(parts)-1]
+		}
+		filePath = strings.Trim(filePath, "\"")
+		if filePath != "" {
+			files = append(files, filePath)
 		}
 	}
 	return files

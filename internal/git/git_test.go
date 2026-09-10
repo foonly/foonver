@@ -173,3 +173,50 @@ func TestExitCode(t *testing.T) {
 		t.Errorf("Expected non-zero exit code for failed command, got 0")
 	}
 }
+
+func TestGetDirtyFiles(t *testing.T) {
+	dir := setupTestRepo(t)
+	defer os.RemoveAll(dir)
+
+	oldRoot := config.Conf.Info.RootDir
+	oldCwd, _ := os.Getwd()
+	config.Conf.Info.RootDir = dir
+	os.Chdir(dir)
+	defer func() {
+		config.Conf.Info.RootDir = oldRoot
+		os.Chdir(oldCwd)
+	}()
+
+	// Track initial files
+	file1 := "consts.php"
+	file2 := "readme.txt"
+	if err := os.WriteFile(filepath.Join(dir, file1), []byte("<?php"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, file2), []byte("readme"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	runGit("add", file1, file2)
+	runGit("commit", "-m", "add files")
+
+	// Modify files (unstaged changes -> " M consts.php")
+	if err := os.WriteFile(filepath.Join(dir, file1), []byte("<?php // edited"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, file2), []byte("readme edited"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	dirty := GetDirtyFiles()
+	if len(dirty) != 2 {
+		t.Fatalf("expected 2 dirty files, got %d: %v", len(dirty), dirty)
+	}
+
+	// Ensure filenames are intact and not missing first character
+	expected := map[string]bool{"consts.php": true, "readme.txt": true}
+	for _, f := range dirty {
+		if !expected[f] {
+			t.Errorf("unexpected dirty file %q (expected one of consts.php, readme.txt)", f)
+		}
+	}
+}
