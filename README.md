@@ -117,13 +117,13 @@ foonver major --push --remote upstream
 
 ## Configuration
 
-Foonver looks for a `foonver.toml`, `foonver.yaml`, or `foonver.json` file in the following locations (in order):
+Foonver looks for a `.foonver.toml`, `.foonver.yaml`, or `.foonver.json` file (falling back to `foonver.toml`, `foonver.yaml`, or `foonver.json` if the dotfile is not found) in the following locations (in order):
 
 1. The project root directory.
 2. The XDG configuration home (usually `~/.config/foonver/`).
 3. `/etc/foonver/`.
 
-### Example Configuration (`foonver.toml`)
+### Example Configuration (`.foonver.toml`)
 
 ```toml
 # Automatically push commits and tags to remote

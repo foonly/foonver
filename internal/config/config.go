@@ -92,11 +92,11 @@ type Config struct {
 var Conf Config
 
 func Init() {
-	viper.SetConfigName("foonver")
+	viper.SetConfigName(".foonver")
 
-	viper.AddConfigPath("/etc/foonver")
-	viper.AddConfigPath(xdg.ConfigHome)
 	viper.AddConfigPath(Conf.Info.RootDir)
+	viper.AddConfigPath(xdg.ConfigHome)
+	viper.AddConfigPath("/etc/foonver")
 
 	viper.SetDefault("dry-run", false)
 	viper.SetDefault("push", false)
@@ -117,13 +117,21 @@ func Init() {
 	viper.SetDefault("promote", false)
 	viper.SetDefault("include-prereleases", false)
 
-	// Find and read the config file
+	// Find and read the config file (.foonver first, fallback to foonver)
 	err := viper.ReadInConfig()
-
 	if err != nil {
 		var configNotFound viper.ConfigFileNotFoundError
 		if errors.As(err, &configNotFound) {
-			fmt.Fprintf(os.Stderr, "No config file found, using defaults\n")
+			viper.SetConfigName("foonver")
+			err = viper.ReadInConfig()
+			if err != nil {
+				if errors.As(err, &configNotFound) {
+					fmt.Fprintf(os.Stderr, "No config file found, using defaults\n")
+				} else {
+					fmt.Fprintf(os.Stderr, "Error reading config file: %v\n", err)
+					os.Exit(1)
+				}
+			}
 		} else {
 			fmt.Fprintf(os.Stderr, "Error reading config file: %v\n", err)
 			os.Exit(1)

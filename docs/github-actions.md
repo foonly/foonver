@@ -99,4 +99,4 @@ STEP_TYPE=$(foonver auto --json --dry-run | jq -r '.steps[0].type')
 
 1. **Fetch Depth**: Always use `fetch-depth: 0` with `actions/checkout`. `foonver` relies on Git tags and history to calculate the correct version bump. If the history is truncated, it may calculate an incorrect version.
 2. **Permissions**: Ensure your workflow has `contents: write` permissions so that `foonver` can push tags and the release step can create the GitHub Release.
-3. **CI Config**: You can store your preferred `foonver` settings in a `foonver.toml` in your repository root to keep your workflow files clean.
+3. **CI Config**: You can store your preferred `foonver` settings in a `.foonver.toml` in your repository root to keep your workflow files clean.
