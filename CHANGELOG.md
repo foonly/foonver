@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.14.0 (2026-06-17)
+## 0.15.0 (2026-09-10)
+
+#### Features
+
+- config: warn when both hidden and legacy config files exist (3105edc)
+- config: support dotfile configuration with legacy fallback (cc654e2)
+- version: add support for prerelease lifecycles and promotion (61a3a82)
+
+## v0.14.0 (2026-06-17)
 
 #### Features
 
