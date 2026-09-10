@@ -496,6 +496,8 @@ func TestDiscoverVersion_Fallback(t *testing.T) {
 	runGit("init")
 	runGit("config", "user.email", "test@example.com")
 	runGit("config", "user.name", "Test User")
+	runGit("config", "commit.gpgsign", "false")
+	runGit("config", "tag.gpgsign", "false")
 	runGit("commit", "--allow-empty", "-m", "initial")
 	runGit("tag", "v1.2.3")
 
@@ -614,4 +616,169 @@ func TestDiscoverVersion_Fallback(t *testing.T) {
 			t.Errorf("expected nil content")
 		}
 	})
+}
+
+func TestParsePrerelease(t *testing.T) {
+	tests := []struct {
+		input   string
+		wantTag string
+		wantNum int
+	}{
+		{"", "", 0},
+		{"beta.1", "beta", 1},
+		{"beta.2", "beta", 2},
+		{"rc.10", "rc", 10},
+		{"alpha", "alpha", 0},
+		{"preview.1", "preview", 1},
+		{"alpha.beta.3", "alpha.beta", 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			gotTag, gotNum := parsePrerelease(tt.input)
+			if gotTag != tt.wantTag || gotNum != tt.wantNum {
+				t.Errorf("parsePrerelease(%q) = (%q, %d), want (%q, %d)", tt.input, gotTag, gotNum, tt.wantTag, tt.wantNum)
+			}
+		})
+	}
+}
+
+func TestDetermineNextVersion_Prerelease(t *testing.T) {
+	tests := []struct {
+		name       string
+		current    string
+		target     string
+		setVersion string
+		prerelease string
+		promote    bool
+		want       string
+		wantErr    bool
+	}{
+		{
+			name:       "bump minor into prerelease beta",
+			current:    "1.1.0",
+			target:     "minor",
+			prerelease: "beta",
+			want:       "1.2.0-beta.1",
+		},
+		{
+			name:       "bump major into prerelease alpha",
+			current:    "1.1.0",
+			target:     "major",
+			prerelease: "alpha",
+			want:       "2.0.0-alpha.1",
+		},
+		{
+			name:       "bump patch into prerelease rc",
+			current:    "1.1.0",
+			target:     "patch",
+			prerelease: "rc",
+			want:       "1.1.1-rc.1",
+		},
+		{
+			name:    "auto increment prerelease number",
+			current: "1.2.0-beta.1",
+			target:  "auto",
+			want:    "1.2.0-beta.2",
+		},
+		{
+			name:    "prerelease command increment number",
+			current: "1.2.0-beta.2",
+			target:  "prerelease",
+			want:    "1.2.0-beta.3",
+		},
+		{
+			name:    "prerelease command alias pre",
+			current: "1.2.0-beta.3",
+			target:  "pre",
+			want:    "1.2.0-beta.4",
+		},
+		{
+			name:       "switch prerelease identifier to rc",
+			current:    "1.2.0-beta.4",
+			target:     "auto",
+			prerelease: "rc",
+			want:       "1.2.0-rc.1",
+		},
+		{
+			name:       "prerelease command switch identifier",
+			current:    "1.2.0-beta.4",
+			target:     "prerelease",
+			prerelease: "rc",
+			want:       "1.2.0-rc.1",
+		},
+		{
+			name:    "promote prerelease to stable via auto",
+			current: "1.2.0-rc.2",
+			target:  "auto",
+			promote: true,
+			want:    "1.2.0",
+		},
+		{
+			name:    "promote prerelease to stable via prerelease command",
+			current: "1.2.0-beta.1",
+			target:  "prerelease",
+			promote: true,
+			want:    "1.2.0",
+		},
+		{
+			name:    "promote on stable version errors out",
+			current: "1.2.0",
+			target:  "auto",
+			promote: true,
+			wantErr: true,
+		},
+		{
+			name:    "prerelease command on stable version errors out",
+			current: "1.2.0",
+			target:  "prerelease",
+			wantErr: true,
+		},
+		{
+			name:    "explicit patch bump while in prerelease",
+			current: "1.2.0-beta.2",
+			target:  "patch",
+			want:    "1.2.1-beta.1",
+		},
+		{
+			name:    "explicit major bump while in prerelease",
+			current: "1.2.0-beta.2",
+			target:  "major",
+			want:    "2.0.0-beta.1",
+		},
+		{
+			name:       "explicit minor bump while in prerelease with tag switch",
+			current:    "1.2.0-beta.2",
+			target:     "minor",
+			prerelease: "rc",
+			want:       "1.3.0-rc.1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config.Conf.Prerelease = tt.prerelease
+			config.Conf.Promote = tt.promote
+			defer func() {
+				config.Conf.Prerelease = ""
+				config.Conf.Promote = false
+			}()
+
+			currV, err := semver.NewVersion(tt.current)
+			if err != nil {
+				t.Fatalf("invalid test semver %s: %v", tt.current, err)
+			}
+
+			nextV, _, _, err := determineNextVersion(currV, tt.target, tt.setVersion)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("determineNextVersion() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				return
+			}
+			if nextV.String() != tt.want {
+				t.Errorf("determineNextVersion() = %s, want %s", nextV.String(), tt.want)
+			}
+		})
+	}
 }

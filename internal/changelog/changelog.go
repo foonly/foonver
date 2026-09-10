@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/foonly/foonver/internal/config"
 	"github.com/foonly/foonver/internal/git"
 )
@@ -40,13 +41,58 @@ func GenerateMarkdown(nextVersion string, latestOnly bool) (string, error) {
 		return "", err
 	}
 
+	sort.SliceStable(tags, func(i, j int) bool {
+		v1, err1 := semver.NewVersion(tags[i].Name)
+		v2, err2 := semver.NewVersion(tags[j].Name)
+		if err1 == nil && err2 == nil {
+			return v1.LessThan(v2)
+		}
+		if err1 == nil {
+			return false
+		}
+		if err2 == nil {
+			return true
+		}
+		return i < j
+	})
+
 	var b strings.Builder
 	if !latestOnly {
 		b.WriteString("# Changelog\n\n")
 	}
 
-	// No tags: fall back to full history.
-	if len(tags) == 0 {
+	includePrereleases := config.Conf.IncludePrereleases
+
+	inPrereleaseMode := false
+	if nextVersion != "" && nextVersion != "Unreleased" {
+		inPrereleaseMode = isPrerelease(nextVersion)
+	} else if len(tags) > 0 {
+		inPrereleaseMode = isPrerelease(tags[len(tags)-1].Name)
+	}
+
+	lastStableIdx := -1
+	for i := len(tags) - 1; i >= 0; i-- {
+		if !isPrerelease(tags[i].Name) {
+			lastStableIdx = i
+			break
+		}
+	}
+
+	var renderedTags []git.Tag
+	if includePrereleases {
+		renderedTags = tags
+	} else {
+		for i, tag := range tags {
+			if !isPrerelease(tag.Name) {
+				renderedTags = append(renderedTags, tag)
+			} else if inPrereleaseMode && i > lastStableIdx {
+				renderedTags = append(renderedTags, tag)
+			}
+		}
+	}
+
+	// No tags to render: fall back to full history.
+	if len(renderedTags) == 0 {
 		title := nextVersion
 		if title == "" {
 			title = "Unreleased"
@@ -59,8 +105,8 @@ func GenerateMarkdown(nextVersion string, latestOnly bool) (string, error) {
 		return b.String(), nil
 	}
 
-	// Include any unreleased changes since the last tag.
-	lastTag := tags[len(tags)-1]
+	// Include any unreleased changes since the last rendered tag.
+	lastRenderedTag := renderedTags[len(renderedTags)-1]
 	currentTime := time.Now()
 
 	title := "Unreleased"
@@ -69,9 +115,9 @@ func GenerateMarkdown(nextVersion string, latestOnly bool) (string, error) {
 		title = nextVersion
 		dateNow = currentTime.Format("2006-01-02")
 	}
-	unreleasedCommits, err := filteredCommits(fmt.Sprintf("%s..HEAD", lastTag.Name), title)
+	unreleasedCommits, err := filteredCommits(fmt.Sprintf("%s..HEAD", lastRenderedTag.Name), title)
 	if err == nil && len(unreleasedCommits) > 0 {
-		group, err := generateGroup(fmt.Sprintf("%s..HEAD", lastTag.Name), title, dateNow)
+		group, err := generateGroup(fmt.Sprintf("%s..HEAD", lastRenderedTag.Name), title, dateNow)
 		if err == nil {
 			b.WriteString(group)
 			if latestOnly {
@@ -81,15 +127,15 @@ func GenerateMarkdown(nextVersion string, latestOnly bool) (string, error) {
 	}
 
 	// tags are oldest -> newest; render newest -> oldest
-	for i := len(tags) - 1; i >= 0; i-- {
-		tag := tags[i]
+	for i := len(renderedTags) - 1; i >= 0; i-- {
+		tag := renderedTags[i]
 
 		var revRange string
 		if i == 0 {
 			// First tag: include all commits up to this tag.
 			revRange = tag.Name
 		} else {
-			prev := tags[i-1]
+			prev := renderedTags[i-1]
 			revRange = fmt.Sprintf("%s..%s", prev.Name, tag.Name)
 		}
 		group, err := generateGroup(revRange, tag.Name, tag.Date)
@@ -104,6 +150,14 @@ func GenerateMarkdown(nextVersion string, latestOnly bool) (string, error) {
 	}
 
 	return b.String(), nil
+}
+
+func isPrerelease(tagName string) bool {
+	v, err := semver.NewVersion(tagName)
+	if err != nil {
+		return false
+	}
+	return v.Prerelease() != ""
 }
 
 // WriteChangelog generates the markdown and writes it to the configured file.

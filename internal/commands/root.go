@@ -3,27 +3,31 @@ package commands
 import (
 	"github.com/foonly/foonver/internal/config"
 	"github.com/foonly/foonver/internal/git"
+	"github.com/foonly/foonver/internal/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
-	flagQuiet        bool
-	flagNormal       bool
-	flagVerbose      bool
-	flagDebug        bool
-	flagPush         bool
-	flagNoPush       bool
-	flagChangelog    bool
-	flagDryRun       bool
-	flagReleaseNotes string
-	flagPrintVersion bool
-	flagJSON         bool
-	flagSync         []string
-	flagRemote       string
-	flagCommitMsg    string
-	flagCommitSuffix string
-	flagVersionFile  string
+	flagQuiet              bool
+	flagNormal             bool
+	flagVerbose            bool
+	flagDebug              bool
+	flagPush               bool
+	flagNoPush             bool
+	flagChangelog          bool
+	flagDryRun             bool
+	flagReleaseNotes       string
+	flagPrintVersion       bool
+	flagJSON               bool
+	flagSync               []string
+	flagRemote             string
+	flagCommitMsg          string
+	flagCommitSuffix       string
+	flagVersionFile        string
+	flagPrerelease         string
+	flagPromote            bool
+	flagIncludePrereleases bool
 )
 
 var rootCmd = &cobra.Command{
@@ -35,6 +39,7 @@ var rootCmd = &cobra.Command{
 		_ = git.EnsureRepo()
 		config.Init()
 	},
+	RunE: version.RunVersion,
 }
 
 func Execute() error {
@@ -58,6 +63,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&flagCommitMsg, "commit-message", "m", "", "custom commit message")
 	rootCmd.PersistentFlags().StringVar(&flagCommitSuffix, "commit-suffix", "", "suffix to append to the commit message")
 	rootCmd.PersistentFlags().StringVar(&flagVersionFile, "version-file", "", "explicitly specify the version file")
+	rootCmd.PersistentFlags().StringVar(&flagPrerelease, "prerelease", "", "set or switch prerelease identifier (e.g. alpha, beta, rc)")
+	rootCmd.PersistentFlags().BoolVar(&flagPromote, "promote", false, "promote prerelease version to stable release")
+	rootCmd.PersistentFlags().BoolVar(&flagIncludePrereleases, "include-prereleases", false, "include prerelease versions in changelog")
 
 	rootCmd.MarkFlagsMutuallyExclusive("quiet", "normal", "verbose", "debug")
 	rootCmd.MarkFlagsMutuallyExclusive("push", "no-push")
@@ -78,6 +86,9 @@ func init() {
 	viper.BindPFlag("commit-message", rootCmd.PersistentFlags().Lookup("commit-message"))
 	viper.BindPFlag("commit-suffix", rootCmd.PersistentFlags().Lookup("commit-suffix"))
 	viper.BindPFlag("version-file", rootCmd.PersistentFlags().Lookup("version-file"))
+	viper.BindPFlag("prerelease", rootCmd.PersistentFlags().Lookup("prerelease"))
+	viper.BindPFlag("promote", rootCmd.PersistentFlags().Lookup("promote"))
+	viper.BindPFlag("include-prereleases", rootCmd.PersistentFlags().Lookup("include-prereleases"))
 
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }

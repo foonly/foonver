@@ -68,22 +68,25 @@ type GitInfo struct {
 }
 
 type Config struct {
-	DryRun        bool     `mapstructure:"dry-run"`
-	Push          bool     `mapstructure:"push"`
-	Prefix        string   `mapstructure:"prefix"`
-	Remote        string   `mapstructure:"remote"`
-	Verbosity     Level    `mapstructure:"verbosity"`
-	Parser        string   `mapstructure:"parser"`
-	Changelog     bool     `mapstructure:"changelog"`
-	File          string   `mapstructure:"file"`
-	VersionSync   []string `mapstructure:"version-sync"`
-	ReleaseNotes  string   `mapstructure:"release-notes"`
-	PrintVersion  bool     `mapstructure:"print-version"`
-	JSON          bool     `mapstructure:"json"`
-	CommitMessage string   `mapstructure:"commit-message"`
-	CommitSuffix  string   `mapstructure:"commit-suffix"`
-	VersionFile   string   `mapstructure:"version-file"`
-	Info          GitInfo
+	DryRun             bool     `mapstructure:"dry-run"`
+	Push               bool     `mapstructure:"push"`
+	Prefix             string   `mapstructure:"prefix"`
+	Remote             string   `mapstructure:"remote"`
+	Verbosity          Level    `mapstructure:"verbosity"`
+	Parser             string   `mapstructure:"parser"`
+	Changelog          bool     `mapstructure:"changelog"`
+	File               string   `mapstructure:"file"`
+	VersionSync        []string `mapstructure:"version-sync"`
+	ReleaseNotes       string   `mapstructure:"release-notes"`
+	PrintVersion       bool     `mapstructure:"print-version"`
+	JSON               bool     `mapstructure:"json"`
+	CommitMessage      string   `mapstructure:"commit-message"`
+	CommitSuffix       string   `mapstructure:"commit-suffix"`
+	VersionFile        string   `mapstructure:"version-file"`
+	Prerelease         string   `mapstructure:"prerelease"`
+	Promote            bool     `mapstructure:"promote"`
+	IncludePrereleases bool     `mapstructure:"include-prereleases"`
+	Info               GitInfo
 }
 
 var Conf Config
@@ -110,6 +113,9 @@ func Init() {
 	viper.SetDefault("commit-message", "")
 	viper.SetDefault("commit-suffix", "")
 	viper.SetDefault("version-file", "")
+	viper.SetDefault("prerelease", "")
+	viper.SetDefault("promote", false)
+	viper.SetDefault("include-prereleases", false)
 
 	// Find and read the config file
 	err := viper.ReadInConfig()
@@ -193,6 +199,18 @@ func processFlags() {
 
 	if viper.IsSet("version-file") {
 		Conf.VersionFile = viper.GetString("version-file")
+	}
+
+	if viper.IsSet("prerelease") {
+		Conf.Prerelease = viper.GetString("prerelease")
+	}
+
+	if viper.IsSet("promote") && viper.GetBool("promote") {
+		Conf.Promote = true
+	}
+
+	if viper.IsSet("include-prereleases") && viper.GetBool("include-prereleases") {
+		Conf.IncludePrereleases = true
 	}
 
 	if viper.IsSet("quiet") && viper.GetBool("quiet") {

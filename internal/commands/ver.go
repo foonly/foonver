@@ -32,6 +32,13 @@ var patchCommand = &cobra.Command{
 	RunE:  version.RunVersion,
 }
 
+var prereleaseCommand = &cobra.Command{
+	Use:     "prerelease",
+	Aliases: []string{"pre"},
+	Short:   "Bump or switch prerelease version",
+	RunE:    version.RunVersion,
+}
+
 var verCommand = &cobra.Command{
 	Use:   "ver [version]",
 	Short: "Set the project version",
@@ -44,6 +51,7 @@ func init() {
 	rootCmd.AddCommand(majorCommand)
 	rootCmd.AddCommand(minorCommand)
 	rootCmd.AddCommand(patchCommand)
+	rootCmd.AddCommand(prereleaseCommand)
 	rootCmd.AddCommand(verCommand)
 }
 

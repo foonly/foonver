@@ -1,8 +1,12 @@
 package changelog
 
 import (
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/foonly/foonver/internal/config"
 )
 
 func TestFindVerRegex(t *testing.T) {
@@ -68,4 +72,157 @@ func TestMessageFiltering(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsPrerelease(t *testing.T) {
+	tests := []struct {
+		tag  string
+		want bool
+	}{
+		{"v1.0.0", false},
+		{"1.0.0", false},
+		{"v1.2.0-beta.1", true},
+		{"1.2.0-beta.1", true},
+		{"v1.2.0-rc.2", true},
+		{"v2.0.0-alpha", true},
+		{"not-a-semver", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.tag, func(t *testing.T) {
+			got := isPrerelease(tt.tag)
+			if got != tt.want {
+				t.Errorf("isPrerelease(%q) = %v, want %v", tt.tag, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGenerateMarkdown_Prerelease(t *testing.T) {
+	dir, err := os.MkdirTemp("", "foonver-changelog-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	runGit := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %s failed: %v\nOutput: %s", strings.Join(args, " "), err, string(out))
+		}
+	}
+
+	runGit("init")
+	runGit("config", "user.email", "test@example.com")
+	runGit("config", "user.name", "Test User")
+	runGit("config", "commit.gpgsign", "false")
+	runGit("config", "tag.gpgsign", "false")
+
+	// Commit 1 -> v1.0.0
+	runGit("commit", "--allow-empty", "-m", "feat: initial release")
+	runGit("tag", "v1.0.0")
+
+	// Commit 2 -> v1.1.0-beta.1
+	runGit("commit", "--allow-empty", "-m", "feat: beta feature in 1.1.0")
+	runGit("tag", "v1.1.0-beta.1")
+
+	// Commit 3 -> v1.1.0
+	runGit("commit", "--allow-empty", "-m", "fix: finalize 1.1.0")
+	runGit("tag", "v1.1.0")
+
+	// Commit 4 -> v1.2.0-beta.1
+	runGit("commit", "--allow-empty", "-m", "feat: beta 1 in 1.2.0")
+	runGit("tag", "v1.2.0-beta.1")
+
+	// Commit 5 -> v1.2.0-beta.2
+	runGit("commit", "--allow-empty", "-m", "feat: beta 2 in 1.2.0")
+	runGit("tag", "v1.2.0-beta.2")
+
+	// Unreleased commit
+	runGit("commit", "--allow-empty", "-m", "fix: unreleased fix")
+
+	oldRoot := config.Conf.Info.RootDir
+	config.Conf.Info.RootDir = dir
+	oldCwd, _ := os.Getwd()
+	os.Chdir(dir)
+	defer func() {
+		config.Conf.Info.RootDir = oldRoot
+		os.Chdir(oldCwd)
+		config.Conf.IncludePrereleases = false
+	}()
+
+	t.Run("in prerelease mode", func(t *testing.T) {
+		config.Conf.IncludePrereleases = false
+		md, err := GenerateMarkdown("v1.2.0-beta.3", false)
+		if err != nil {
+			t.Fatalf("GenerateMarkdown failed: %v", err)
+		}
+
+		// Active prereleases of 1.2.0 should be present
+		if !strings.Contains(md, "v1.2.0-beta.3") {
+			t.Errorf("expected v1.2.0-beta.3 in changelog, got:\n%s", md)
+		}
+		if !strings.Contains(md, "v1.2.0-beta.2") {
+			t.Errorf("expected v1.2.0-beta.2 in changelog, got:\n%s", md)
+		}
+		if !strings.Contains(md, "v1.2.0-beta.1") {
+			t.Errorf("expected v1.2.0-beta.1 in changelog, got:\n%s", md)
+		}
+		if !strings.Contains(md, "v1.1.0") {
+			t.Errorf("expected v1.1.0 in changelog, got:\n%s", md)
+		}
+		// Past finalized prerelease v1.1.0-beta.1 should be omitted
+		if strings.Contains(md, "v1.1.0-beta.1") {
+			t.Errorf("v1.1.0-beta.1 should NOT be shown separately in changelog, got:\n%s", md)
+		}
+		// Commit from v1.1.0-beta.1 should still be combined under v1.1.0
+		if !strings.Contains(md, "beta feature in 1.1.0") {
+			t.Errorf("expected 'beta feature in 1.1.0' combined under v1.1.0, got:\n%s", md)
+		}
+	})
+
+	t.Run("promoted to stable", func(t *testing.T) {
+		config.Conf.IncludePrereleases = false
+		md, err := GenerateMarkdown("v1.2.0", false)
+		if err != nil {
+			t.Fatalf("GenerateMarkdown failed: %v", err)
+		}
+
+		if !strings.Contains(md, "v1.2.0") {
+			t.Errorf("expected v1.2.0 in changelog, got:\n%s", md)
+		}
+		// Prereleases of 1.2.0 should now be omitted
+		if strings.Contains(md, "v1.2.0-beta.2") {
+			t.Errorf("v1.2.0-beta.2 should NOT be shown in changelog, got:\n%s", md)
+		}
+		if strings.Contains(md, "v1.2.0-beta.1") {
+			t.Errorf("v1.2.0-beta.1 should NOT be shown in changelog, got:\n%s", md)
+		}
+		// Commits from 1.2.0 beta cycle should be combined under v1.2.0
+		if !strings.Contains(md, "beta 1 in 1.2.0") {
+			t.Errorf("expected 'beta 1 in 1.2.0' combined under v1.2.0, got:\n%s", md)
+		}
+		if !strings.Contains(md, "beta 2 in 1.2.0") {
+			t.Errorf("expected 'beta 2 in 1.2.0' combined under v1.2.0, got:\n%s", md)
+		}
+	})
+
+	t.Run("with include-prereleases", func(t *testing.T) {
+		config.Conf.IncludePrereleases = true
+		md, err := GenerateMarkdown("v1.2.0", false)
+		if err != nil {
+			t.Fatalf("GenerateMarkdown failed: %v", err)
+		}
+
+		if !strings.Contains(md, "v1.2.0-beta.2") {
+			t.Errorf("expected v1.2.0-beta.2 with include-prereleases, got:\n%s", md)
+		}
+		if !strings.Contains(md, "v1.2.0-beta.1") {
+			t.Errorf("expected v1.2.0-beta.1 with include-prereleases, got:\n%s", md)
+		}
+		if !strings.Contains(md, "v1.1.0-beta.1") {
+			t.Errorf("expected v1.1.0-beta.1 with include-prereleases, got:\n%s", md)
+		}
+	})
 }

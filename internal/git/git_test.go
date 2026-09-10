@@ -27,6 +27,8 @@ func setupTestRepo(t *testing.T) string {
 	run("init")
 	run("config", "user.email", "test@example.com")
 	run("config", "user.name", "Test User")
+	run("config", "commit.gpgsign", "false")
+	run("config", "tag.gpgsign", "false")
 	run("commit", "--allow-empty", "-m", "initial commit")
 
 	return dir

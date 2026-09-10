@@ -17,6 +17,7 @@ Version 0.14.0
   - Optional automatic pushing of tags and commits to a configurable remote.
 - **Changelog Management**: Categorizes commits and automatically updates `CHANGELOG.md`.
   - Automatically filters out version-only commits and those containing `[skip ci]` or `[skip action]`.
+- **Prerelease Support**: Create and manage prerelease cycles (`alpha`, `beta`, `rc`, etc.) with automatic counter increments, tag transitions, promotion to stable, and smart changelog aggregation.
 
 ## Installation
 
@@ -59,6 +60,34 @@ foonver minor   # 1.0.0 -> 1.1.0
 foonver patch   # 1.0.0 -> 1.0.1
 foonver ver 1.2.3  # Set version specifically to 1.2.3
 ```
+
+### Prerelease Versions
+
+Foonver provides first-class support for prerelease lifecycles (e.g. `alpha`, `beta`, `preview`, `rc`):
+
+```bash
+# Start a prerelease cycle on a minor bump (1.1.0 -> 1.2.0-beta.1)
+foonver minor --prerelease=beta
+
+# Increment prerelease counter while in prerelease mode (1.2.0-beta.1 -> 1.2.0-beta.2)
+foonver auto
+# or explicitly:
+foonver prerelease
+
+# Switch prerelease identifier (1.2.0-beta.2 -> 1.2.0-rc.1)
+foonver auto --prerelease=rc
+
+# Explicit bumps inside a prerelease cycle (1.2.0-beta.2 -> 1.2.1-beta.1 or 2.0.0-beta.1)
+foonver patch
+foonver major
+
+# Promote prerelease to stable release (1.2.0-rc.1 -> 1.2.0)
+foonver auto --promote
+# or directly:
+foonver --promote
+```
+
+When generating the changelog, prerelease commits within the active cycle are shown individually, but once promoted to stable, all intermediate prerelease commits are automatically consolidated under the final release heading. To include intermediate prereleases in the changelog, pass `--include-prereleases`.
 
 ### Dry Run
 
@@ -129,6 +158,12 @@ file = "CHANGELOG.md"
 
 # Synchronize version in other files (finds first mention with "version", "v", "ver", or "stable tag" prefix)
 version-sync = ["README.md", "docs/install.md"]
+
+# Default prerelease tag identifier (e.g., "beta", "rc")
+prerelease = ""
+
+# Include intermediate prereleases in changelog
+include-prereleases = false
 ```
 
 ## Supported Version Files

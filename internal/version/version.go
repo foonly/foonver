@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -99,6 +100,9 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 			fmt.Println(nextVersionStr)
 		} else {
 			fmt.Println("Version is already up to date.")
+			if plan.CurrentVersion.Prerelease() != "" {
+				fmt.Printf("Project is in prerelease mode (%s). Run \"foonver --promote\" to exit prerelease mode.\n", plan.CurrentVersion.Original())
+			}
 		}
 		return nil
 	}
@@ -119,6 +123,9 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 			fmt.Println("Planned actions:")
 			for _, step := range plan.Steps {
 				fmt.Printf("  - %s\n", step.Description)
+			}
+			if plan.NextVersion.Prerelease() != "" {
+				fmt.Printf("Project is in prerelease mode (%s). Run \"foonver --promote\" to exit prerelease mode.\n", nextVersionStr)
 			}
 		}
 		return nil
@@ -148,6 +155,9 @@ func RunVersion(cmd *cobra.Command, args []string) error {
 		fmt.Println(nextVersionStr)
 	} else {
 		fmt.Printf("Successfully bumped version to %s\n", nextVersionStr)
+		if plan.NextVersion.Prerelease() != "" {
+			fmt.Printf("Project is in prerelease mode (%s). Run \"foonver --promote\" to exit prerelease mode.\n", nextVersionStr)
+		}
 	}
 	return nil
 }
@@ -391,43 +401,152 @@ func extractVersion(filename string, content []byte) (string, error) {
 	return "", fmt.Errorf("unsupported file type")
 }
 
+// parsePrerelease extracts the tag prefix and the numeric counter from a prerelease string.
+// E.g. "beta.1" -> ("beta", 1), "rc.2" -> ("rc", 2), "alpha" -> ("alpha", 0).
+func parsePrerelease(pre string) (string, int) {
+	if pre == "" {
+		return "", 0
+	}
+	parts := strings.Split(pre, ".")
+	if len(parts) >= 2 {
+		if n, err := strconv.Atoi(parts[len(parts)-1]); err == nil {
+			tag := strings.Join(parts[:len(parts)-1], ".")
+			return tag, n
+		}
+	}
+	return pre, 0
+}
+
 // determineNextVersion calculates the next version based on a target ("major", "minor", "patch",
-// or a specific version string) or automatically by analyzing Git commit messages.
+// "prerelease", "auto", or a specific version string) or automatically by analyzing Git commit messages.
 func determineNextVersion(current *semver.Version, target string, setVersion string) (*semver.Version, []string, string, error) {
 	action := strings.TrimSpace(strings.ToLower(target))
-	var commits []string
-	var lastTag string
+	currentIsPrerelease := current.Prerelease() != ""
+	currTag, currNum := parsePrerelease(current.Prerelease())
+	reqTag := strings.TrimSpace(config.Conf.Prerelease)
 
 	if action == "ver" {
 		v, err := semver.NewVersion(setVersion)
 		return v, nil, "", err
 	}
 
+	if config.Conf.Promote {
+		if !currentIsPrerelease {
+			return nil, nil, "", fmt.Errorf("cannot promote: current version %s is not a prerelease", current.Original())
+		}
+		_, commits, lastTag, _ := autoVersion()
+
+		var major, minor, patch uint64
+		switch action {
+		case "major":
+			major, minor, patch = current.Major()+1, 0, 0
+		case "minor":
+			major, minor, patch = current.Major(), current.Minor()+1, 0
+		case "patch":
+			major, minor, patch = current.Major(), current.Minor(), current.Patch()+1
+		default:
+			major, minor, patch = current.Major(), current.Minor(), current.Patch()
+		}
+
+		next := semver.New(major, minor, patch, "", "")
+		return next, commits, lastTag, nil
+	}
+
+	if action == "prerelease" || action == "pre" {
+		if !currentIsPrerelease {
+			return nil, nil, "", fmt.Errorf("current version %s is not a prerelease version", current.Original())
+		}
+		_, commits, lastTag, _ := autoVersion()
+		if reqTag != "" && reqTag != currTag {
+			next := semver.New(current.Major(), current.Minor(), current.Patch(), fmt.Sprintf("%s.1", reqTag), "")
+			return next, commits, lastTag, nil
+		}
+		tag := currTag
+		if tag == "" {
+			tag = "beta"
+		}
+		next := semver.New(current.Major(), current.Minor(), current.Patch(), fmt.Sprintf("%s.%d", tag, currNum+1), "")
+		return next, commits, lastTag, nil
+	}
+
 	if action == "auto" {
-		var auto string
-		var err error
-		auto, commits, lastTag, err = autoVersion()
+		if currentIsPrerelease {
+			_, commits, lastTag, _ := autoVersion()
+			if reqTag != "" && reqTag != currTag {
+				next := semver.New(current.Major(), current.Minor(), current.Patch(), fmt.Sprintf("%s.1", reqTag), "")
+				return next, commits, lastTag, nil
+			}
+			tag := currTag
+			if tag == "" {
+				tag = "beta"
+			}
+			next := semver.New(current.Major(), current.Minor(), current.Patch(), fmt.Sprintf("%s.%d", tag, currNum+1), "")
+			return next, commits, lastTag, nil
+		}
+
+		auto, commits, lastTag, err := autoVersion()
 		if err != nil {
 			return nil, nil, "", err
 		}
 		if auto != "" && !config.Conf.PrintVersion && !config.Conf.JSON {
 			fmt.Printf("Auto-detected version bump: %s\n", auto)
 		}
-		action = auto
+
+		var major, minor, patch uint64
+		switch auto {
+		case "major":
+			major, minor, patch = current.Major()+1, 0, 0
+		case "minor":
+			major, minor, patch = current.Major(), current.Minor()+1, 0
+		case "patch":
+			major, minor, patch = current.Major(), current.Minor(), current.Patch()+1
+		default:
+			inc := current.IncPatch()
+			major, minor, patch = inc.Major(), inc.Minor(), inc.Patch()
+		}
+
+		if reqTag != "" {
+			next := semver.New(major, minor, patch, fmt.Sprintf("%s.1", reqTag), "")
+			return next, commits, lastTag, nil
+		}
+		next := semver.New(major, minor, patch, "", "")
+		return next, commits, lastTag, nil
 	}
 
-	var next semver.Version
-	switch action {
-	case "major":
-		next = current.IncMajor()
-	case "minor":
-		next = current.IncMinor()
-	case "patch":
-		next = current.IncPatch()
-	default:
-		next = *current
+	if action == "major" || action == "minor" || action == "patch" {
+		_, commits, lastTag, _ := autoVersion()
+		var major, minor, patch uint64
+		switch action {
+		case "major":
+			major, minor, patch = current.Major()+1, 0, 0
+		case "minor":
+			major, minor, patch = current.Major(), current.Minor()+1, 0
+		case "patch":
+			major, minor, patch = current.Major(), current.Minor(), current.Patch()+1
+		}
+
+		if currentIsPrerelease {
+			tag := currTag
+			if reqTag != "" {
+				tag = reqTag
+			}
+			if tag == "" {
+				tag = "beta"
+			}
+			next := semver.New(major, minor, patch, fmt.Sprintf("%s.1", tag), "")
+			return next, commits, lastTag, nil
+		}
+
+		if reqTag != "" {
+			next := semver.New(major, minor, patch, fmt.Sprintf("%s.1", reqTag), "")
+			return next, commits, lastTag, nil
+		}
+		next := semver.New(major, minor, patch, "", "")
+		return next, commits, lastTag, nil
 	}
-	return &next, commits, lastTag, nil
+
+	inc := *current
+	return &inc, nil, "", nil
 }
 
 func autoVersion() (string, []string, string, error) {
