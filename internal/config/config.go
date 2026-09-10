@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 
 	"github.com/adrg/xdg"
 	mapstructure "github.com/go-viper/mapstructure/v2"
@@ -158,6 +160,28 @@ func Init() {
 	}
 
 	processFlags()
+	checkDuplicateConfigs()
+}
+
+func checkDuplicateConfigs() {
+	usedFile := viper.ConfigFileUsed()
+	if usedFile == "" {
+		return
+	}
+	base := filepath.Base(usedFile)
+	if strings.HasPrefix(base, ".") {
+		dir := filepath.Dir(usedFile)
+		legacyNames := []string{"foonver.toml", "foonver.yaml", "foonver.yml", "foonver.json"}
+		for _, leg := range legacyNames {
+			legPath := filepath.Join(dir, leg)
+			if _, err := os.Stat(legPath); err == nil {
+				if Conf.Verbosity != Quiet && !Conf.PrintVersion && !Conf.JSON {
+					fmt.Fprintf(os.Stderr, "Warning: Both %s and %s exist. Using %s and ignoring %s.\n", base, leg, base, leg)
+				}
+				break
+			}
+		}
+	}
 }
 
 func processFlags() {

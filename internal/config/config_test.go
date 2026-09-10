@@ -1,8 +1,11 @@
 package config
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -64,6 +67,39 @@ func TestConfigDiscovery_DotfileAndFallback(t *testing.T) {
 		Init()
 		if Conf.Prefix != "preferred-dot" {
 			t.Errorf("expected prefix 'preferred-dot', got %q", Conf.Prefix)
+		}
+	})
+
+	t.Run("warns when both .foonver.toml and foonver.toml exist", func(t *testing.T) {
+		dotfilePath := filepath.Join(tempDir, ".foonver.toml")
+		legacyPath := filepath.Join(tempDir, "foonver.toml")
+
+		if err := os.WriteFile(dotfilePath, []byte(`prefix = "dot"`), 0644); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(dotfilePath)
+
+		if err := os.WriteFile(legacyPath, []byte(`prefix = "legacy"`), 0644); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(legacyPath)
+
+		// Capture stderr
+		oldStderr := os.Stderr
+		r, w, _ := os.Pipe()
+		os.Stderr = w
+
+		Init()
+
+		w.Close()
+		os.Stderr = oldStderr
+
+		var buf bytes.Buffer
+		io.Copy(&buf, r)
+		output := buf.String()
+
+		if !strings.Contains(output, "Warning: Both .foonver.toml and foonver.toml exist") {
+			t.Errorf("expected warning about both config files existing, got: %q", output)
 		}
 	})
 }
