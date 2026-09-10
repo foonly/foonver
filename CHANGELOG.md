@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.15.0 (2026-09-10)
+## 0.16.0 (2026-09-10)
+
+#### Features
+
+- version: support multiple sync matches per file (d97b41d)
+
+## v0.15.0 (2026-09-10)
 
 #### Features
 
