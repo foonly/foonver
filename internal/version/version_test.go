@@ -340,6 +340,15 @@ func TestSyncVersion(t *testing.T) {
 			wantErr:    false,
 		},
 		{
+			name:       "multiple matches replaced",
+			filename:   "README.md",
+			content:    "# Project\n\nVersion: 1.0.0\n\nSee v1.0.0 docs.\n",
+			oldVersion: "1.0.0",
+			newVersion: "1.1.0",
+			want:       "# Project\n\nVersion: 1.1.0\n\nSee v1.1.0 docs.\n",
+			wantErr:    false,
+		},
+		{
 			name:       "missing version fails",
 			filename:   "missing.md",
 			content:    "No version string here.",
@@ -391,6 +400,51 @@ func TestSyncVersion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCountSyncMatches(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "count-sync-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	oldRoot := config.Conf.Info.RootDir
+	config.Conf.Info.RootDir = tempDir
+	defer func() { config.Conf.Info.RootDir = oldRoot }()
+
+	filePath := filepath.Join(tempDir, "README.md")
+	content := "# Project\n\nVersion: 1.0.0\n\nCheck out ver 1.0.0 or v1.0.0.\n"
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("counts multiple matches", func(t *testing.T) {
+		count, err := countSyncMatches("README.md", "1.0.0")
+		if err != nil {
+			t.Fatalf("countSyncMatches failed: %v", err)
+		}
+		if count != 3 {
+			t.Errorf("expected 3 matches, got %d", count)
+		}
+	})
+
+	t.Run("counts zero matches for non-existent version", func(t *testing.T) {
+		count, err := countSyncMatches("README.md", "2.0.0")
+		if err != nil {
+			t.Fatalf("countSyncMatches failed: %v", err)
+		}
+		if count != 0 {
+			t.Errorf("expected 0 matches, got %d", count)
+		}
+	})
+
+	t.Run("returns error for missing file", func(t *testing.T) {
+		_, err := countSyncMatches("nonexistent.md", "1.0.0")
+		if err == nil {
+			t.Errorf("expected error for nonexistent file, got nil")
+		}
+	})
 }
 
 func TestUpdateVersionFile(t *testing.T) {

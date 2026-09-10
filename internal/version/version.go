@@ -222,9 +222,25 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 	// 2. Version Sync
 	for _, syncFile := range config.Conf.VersionSync {
 		sFile := syncFile // capture for closure
+		matchInfo := ""
+		count, err := countSyncMatches(sFile, currentVersion.Original())
+		if err != nil {
+			if os.IsNotExist(err) {
+				matchInfo = " (file not found)"
+			} else {
+				matchInfo = fmt.Sprintf(" (read error: %v)", err)
+			}
+		} else if count == 0 {
+			matchInfo = " (0 matches found - will fail)"
+		} else if count == 1 {
+			matchInfo = " (found 1 match)"
+		} else {
+			matchInfo = fmt.Sprintf(" (found %d matches)", count)
+		}
+
 		plan.Steps = append(plan.Steps, PlanStep{
 			Type:        StepSyncVersion,
-			Description: fmt.Sprintf("Sync version in %s: %s -> %s", sFile, currentVersion.Original(), nextVersionStr),
+			Description: fmt.Sprintf("Sync version in %s: %s -> %s%s", sFile, currentVersion.Original(), nextVersionStr, matchInfo),
 			Action: func() error {
 				return syncVersion(sFile, currentVersion.Original(), nextVersionStr)
 			},
@@ -707,8 +723,27 @@ func updateVersionFile(filename, oldVersion, newVersion string, content []byte) 
 	return os.WriteFile(filename, newContent, 0644)
 }
 
-// syncVersion finds the first mention of the old version in the file preceded by "version" or "v"
-// (case insensitive, optional punctuation/whitespace) and replaces it with the new version.
+// countSyncMatches returns the number of version occurrences matching the sync pattern in the given file.
+func countSyncMatches(filename, oldVersion string) (int, error) {
+	filePath := path.Join(config.Conf.Info.RootDir, filename)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return 0, err
+	}
+
+	quotedOld := regexp.QuoteMeta(oldVersion)
+	reStr := fmt.Sprintf(`(?i)(version|v|ver|stable tag)[[:punct:]\s]*(%s)`, quotedOld)
+	re, err := regexp.Compile(reStr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to compile sync regex: %w", err)
+	}
+
+	matches := re.FindAllSubmatchIndex(content, -1)
+	return len(matches), nil
+}
+
+// syncVersion finds mentions of the old version in the file preceded by "version", "v", "ver",
+// or "stable tag" (case insensitive, optional punctuation/whitespace) and replaces them with the new version.
 func syncVersion(filename, oldVersion, newVersion string) error {
 	filePath := path.Join(config.Conf.Info.RootDir, filename)
 	content, err := os.ReadFile(filePath)
@@ -728,22 +763,21 @@ func syncVersion(filename, oldVersion, newVersion string) error {
 		return fmt.Errorf("failed to compile sync regex: %w", err)
 	}
 
-	loc := re.FindSubmatchIndex(content)
-	if loc == nil {
+	matches := re.FindAllSubmatchIndex(content, -1)
+	if len(matches) == 0 {
 		return fmt.Errorf("could not find version '%s' with prefix 'version' or 'v' in %s", oldVersion, filename)
 	}
 
-	// Submatch indices:
-	// loc[0], loc[1] : full match
-	// loc[2], loc[3] : "version" or "v"
-	// loc[4], loc[5] : the version string itself
-	start := loc[4]
-	end := loc[5]
-
 	var newContent bytes.Buffer
-	newContent.Write(content[:start])
-	newContent.WriteString(newVersion)
-	newContent.Write(content[end:])
+	lastEnd := 0
+	for _, loc := range matches {
+		start := loc[4]
+		end := loc[5]
+		newContent.Write(content[lastEnd:start])
+		newContent.WriteString(newVersion)
+		lastEnd = end
+	}
+	newContent.Write(content[lastEnd:])
 
 	return os.WriteFile(filePath, newContent.Bytes(), 0644)
 }
