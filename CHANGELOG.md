@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.16.0 (2026-09-10)
+### 0.16.1 (2026-09-10)
+
+#### Bug Fixes
+
+- git: properly parse renamed and quoted dirty files (2106d2c)
+
+## v0.16.0 (2026-09-10)
 
 #### Features
 
