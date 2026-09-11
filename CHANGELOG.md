@@ -1,6 +1,12 @@
 # Changelog
 
-### 0.16.1 (2026-09-10)
+## 0.17.0 (2026-09-11)
+
+#### Features
+
+- action: add support for prereleases and promotion (1cbd625)
+
+### v0.16.1 (2026-09-10)
 
 #### Bug Fixes
 
