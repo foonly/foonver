@@ -10,7 +10,7 @@ The easiest way to use `foonver` in your workflow is via the composite action pr
 
 This workflow triggers on every push to the `main` branch. It uses `foonver` to determine if a version bump is needed based on the commit history. If a bump is detected, it creates a GitHub Release with the generated release notes.
 
-```yaml
+````yaml
 name: Release
 
 on:
@@ -45,8 +45,54 @@ jobs:
           name: Release ${{ steps.foonver.outputs.version }}
           body: ${{ steps.foonver.outputs.release_notes }}
           draft: false
-          prerelease: false
-```
+          prerelease: ${{ steps.foonver.outputs.is_prerelease == 'true' }}
+
+### Example Workflow: Prerelease Branches & Promotion
+
+This workflow runs on pushes to `main` and `beta` branches. On the `beta` branch, it automatically manages prereleases (`1.2.0-beta.1`, `1.2.0-beta.2`). When `beta` is merged into `main`, it automatically promotes the prerelease to a stable release (`1.2.0`).
+
+```yaml
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+      - beta
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run foonver
+        id: foonver
+        uses: foonly/foonver@v0.15.0
+        with:
+          command: "auto"
+          changelog: "true"
+          push: "true"
+          prerelease: ${{ github.ref_name != 'main' }}
+          promote: "auto"
+
+      - name: Create GitHub Release
+        if: steps.foonver.outputs.is_bumped == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.foonver.outputs.version }}
+          name: Release ${{ steps.foonver.outputs.version }}
+          body: ${{ steps.foonver.outputs.release_notes }}
+          draft: false
+          prerelease: ${{ steps.foonver.outputs.is_prerelease == 'true' }}
+````
+
+````
 
 ## Inputs
 
@@ -60,15 +106,19 @@ jobs:
 | `commit_message` | Custom commit message.                                                     | `""`     |
 | `commit_suffix`  | Suffix to append to the commit message (e.g., `[skip ci]`).                | `""`     |
 | `dry_run`        | If `true`, simulates the bump and provides outputs without changing files. | `false`  |
-| `version_sync`   | Comma-separated list of files to synchronize version in.                   | `""`     |
-| `args`           | Additional raw CLI arguments to pass to `foonver`.                         | `""`     |
+| `version_sync`        | Comma-separated list of files to synchronize version in.                                                                 | `""`     |
+| `prerelease`          | Prerelease identifier (e.g. `beta`, `rc`) or boolean (`true`/`false`). If `true`, uses the branch name.                  | `""`     |
+| `promote`             | Whether to promote prerelease to stable (`true`, `false`, or `auto`). `auto` promotes when on a stable branch.          | `auto`   |
+| `include_prereleases` | Whether to include intermediate prerelease versions in the changelog.                                                   | `false`  |
+| `args`                | Additional raw CLI arguments to pass to `foonver`.                                                                       | `""`     |
 
 ## Outputs
 
 | Output          | Description                                                              |
 | --------------- | ------------------------------------------------------------------------ |
-| `version`       | The calculated new version string (e.g., `1.2.3`).                       |
+| `version`       | The calculated new version string (e.g., `1.2.3` or `1.2.0-beta.1`).     |
 | `is_bumped`     | Returns `true` if a new version was actually created, `false` otherwise. |
+| `is_prerelease` | Returns `true` if the calculated version is a prerelease.                |
 | `release_notes` | Markdown formatted release notes for just the latest version.            |
 
 ## Advanced CLI Usage in Actions
@@ -80,7 +130,7 @@ If you prefer to use the CLI directly (e.g., if you've already installed the bin
 ```bash
 NEW_VER=$(foonver auto --print-version)
 echo "The next version is $NEW_VER"
-```
+````
 
 ### Exporting Release Notes to a File
 

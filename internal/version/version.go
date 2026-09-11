@@ -44,6 +44,7 @@ type ExecutionPlan struct {
 	CurrentVersionStr string          `json:"current_version"`
 	NextVersion       *semver.Version `json:"-"`
 	NextVersionStr    string          `json:"next_version"`
+	IsPrerelease      bool            `json:"is_prerelease"`
 	VersionFile       string          `json:"version_file"`
 	Commits           []string        `json:"commits"`
 	LastTag           string          `json:"last_tag"`
@@ -197,6 +198,7 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 		CurrentVersionStr: currentVersion.Original(),
 		NextVersion:       nextVersion,
 		NextVersionStr:    nextVersionStr,
+		IsPrerelease:      nextVersion.Prerelease() != "",
 		VersionFile:       fileName,
 		Commits:           commits,
 		LastTag:           lastTag,

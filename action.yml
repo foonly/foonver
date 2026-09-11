@@ -39,6 +39,18 @@ inputs:
   version_sync:
     description: "Comma-separated list of files to synchronize version in"
     required: false
+  prerelease:
+    description: "Prerelease identifier (e.g. beta, rc) or boolean. If 'true', uses the branch name or 'beta'"
+    required: false
+    default: ""
+  promote:
+    description: "Whether to promote prerelease to stable (true, false, or auto)"
+    required: false
+    default: "auto"
+  include_prereleases:
+    description: "Whether to include prerelease versions in the changelog"
+    required: false
+    default: "false"
   args:
     description: "Additional raw arguments for foonver"
     required: false
@@ -50,6 +62,9 @@ outputs:
   is_bumped:
     description: "Whether a version bump occurred"
     value: ${{ steps.run.outputs.is_bumped }}
+  is_prerelease:
+    description: "Whether the resulting version is a prerelease"
+    value: ${{ steps.run.outputs.is_prerelease }}
   release_notes:
     description: "The generated release notes for the latest version"
     value: ${{ steps.run.outputs.release_notes }}
@@ -111,6 +126,35 @@ runs:
           ARGS+=("--sync" "${{ inputs.version_sync }}")
         fi
 
+        PRERELEASE="${{ inputs.prerelease }}"
+        if [ "$PRERELEASE" == "true" ]; then
+          REF_NAME="${GITHUB_REF_NAME:-}"
+          CLEAN_TAG=$(echo "$REF_NAME" | sed 's/[^a-zA-Z0-9.-]/-/g')
+          if [ -z "$CLEAN_TAG" ] || [ "$CLEAN_TAG" == "main" ] || [ "$CLEAN_TAG" == "master" ]; then
+            CLEAN_TAG="beta"
+          fi
+          ARGS+=("--prerelease" "$CLEAN_TAG")
+        elif [ -n "$PRERELEASE" ] && [ "$PRERELEASE" != "false" ]; then
+          ARGS+=("--prerelease" "$PRERELEASE")
+        fi
+
+        PROMOTE="${{ inputs.promote }}"
+        if [ "$PROMOTE" == "true" ]; then
+          ARGS+=("--promote")
+        elif [ "$PROMOTE" == "auto" ]; then
+          if [ -z "$PRERELEASE" ] || [ "$PRERELEASE" == "false" ]; then
+            CHECK_JSON=$(foonver ${{ inputs.command }} --json --dry-run 2>/dev/null || true)
+            CURRENT_VER=$(echo "$CHECK_JSON" | jq -r '.current_version // empty')
+            if [[ "$CURRENT_VER" =~ -[0-9A-Za-z] ]]; then
+              ARGS+=("--promote")
+            fi
+          fi
+        fi
+
+        if [ "${{ inputs.include_prereleases }}" == "true" ]; then
+          ARGS+=("--include-prereleases")
+        fi
+
         if [ -n "${{ inputs.args }}" ]; then
           # Split args by space, but this is a best-effort for raw args string
           read -ra EXTRA_ARGS <<< "${{ inputs.args }}"
@@ -137,6 +181,7 @@ runs:
         # Use jq to extract data from the plan
         NEW_VERSION=$(echo "$PLAN_JSON" | jq -r '.next_version')
         OLD_VERSION=$(echo "$PLAN_JSON" | jq -r '.current_version')
+        IS_PRERELEASE=$(echo "$PLAN_JSON" | jq -r '.is_prerelease // false')
 
         IS_BUMPED="false"
         if [ "$NEW_VERSION" != "$OLD_VERSION" ]; then
@@ -146,6 +191,7 @@ runs:
         # Set outputs
         echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
         echo "is_bumped=$IS_BUMPED" >> $GITHUB_OUTPUT
+        echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
 
         # Capture release notes as a multiline output
         if [ -f "$TEMP_NOTES" ]; then
