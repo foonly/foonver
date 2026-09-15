@@ -33,6 +33,7 @@ jobs:
         id: foonver
         uses: ./
         with:
+          version: "local"
           command: "auto"
           changelog: "true"
           push: "true"
@@ -53,15 +54,15 @@ jobs:
           name: Release ${{ steps.foonver.outputs.version }}
           body: ${{ steps.foonver.outputs.release_notes }}
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.foonver.outputs.is_prerelease == 'true' }}
           files: "bin/foonver"
 
       - name: Update AUR PKGBUILD
-        if: steps.foonver.outputs.is_bumped == 'true'
+        if: steps.foonver.outputs.is_bumped == 'true' && steps.foonver.outputs.is_prerelease != 'true'
         run: ./aur/update-aur.sh ${{ steps.foonver.outputs.version }}
 
       - name: Publish to AUR
-        if: steps.foonver.outputs.is_bumped == 'true'
+        if: steps.foonver.outputs.is_bumped == 'true' && steps.foonver.outputs.is_prerelease != 'true'
         uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
         with:
           pkgname: foonver

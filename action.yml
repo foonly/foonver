@@ -74,10 +74,24 @@ runs:
   steps:
     - name: Download foonver
       shell: bash
-      env:
-        INPUT_VERSION: ${{ inputs.version }}
       run: |
-        VERSION="$INPUT_VERSION"
+        VERSION="${{ inputs.version }}"
+        if [ "$VERSION" = "local" ] || [ "$VERSION" = "skip" ]; then
+          echo "Using local foonver binary"
+          if [ -f "./bin/foonver" ]; then
+            cp ./bin/foonver /usr/local/bin/foonver
+            chmod +x /usr/local/bin/foonver
+          fi
+          exit 0
+        fi
+
+        if [ "$VERSION" = "latest" ] && [ -f "./bin/foonver" ]; then
+          echo "Found locally built ./bin/foonver, using it"
+          cp ./bin/foonver /usr/local/bin/foonver
+          chmod +x /usr/local/bin/foonver
+          exit 0
+        fi
+
         if [ "$VERSION" = "latest" ]; then
           URL="https://github.com/foonly/foonver/releases/latest/download/foonver"
         else
