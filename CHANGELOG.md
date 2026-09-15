@@ -1,6 +1,6 @@
 # Changelog
 
-### 0.17.2-beta.1 (2026-09-15)
+### 0.17.2 (2026-09-15)
 
 #### Continuous Integration
 
