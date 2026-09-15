@@ -1,6 +1,13 @@
 # Changelog
 
-### 0.17.1 (2026-09-15)
+### 0.17.2-beta.1 (2026-09-15)
+
+#### Continuous Integration
+
+- github: support local binary execution in release workflow (b72c56c)
+- github: add support for beta branch releases (7032482)
+
+### v0.17.1 (2026-09-15)
 
 #### Bug Fixes
 
