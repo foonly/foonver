@@ -74,8 +74,10 @@ runs:
   steps:
     - name: Download foonver
       shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
       run: |
-        VERSION="${{ inputs.version }}"
+        VERSION="$INPUT_VERSION"
         if [ "$VERSION" = "latest" ]; then
           URL="https://github.com/foonly/foonver/releases/latest/download/foonver"
         else
@@ -89,44 +91,59 @@ runs:
     - name: Run foonver
       id: run
       shell: bash
+      env:
+        INPUT_COMMAND: ${{ inputs.command }}
+        INPUT_CHANGELOG: ${{ inputs.changelog }}
+        INPUT_PUSH: ${{ inputs.push }}
+        INPUT_REMOTE: ${{ inputs.remote }}
+        INPUT_COMMIT_MESSAGE: ${{ inputs.commit_message }}
+        INPUT_COMMIT_SUFFIX: ${{ inputs.commit_suffix }}
+        INPUT_VERSION_FILE: ${{ inputs.version_file }}
+        INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        INPUT_VERSION_SYNC: ${{ inputs.version_sync }}
+        INPUT_PRERELEASE: ${{ inputs.prerelease }}
+        INPUT_PROMOTE: ${{ inputs.promote }}
+        INPUT_INCLUDE_PRERELEASES: ${{ inputs.include_prereleases }}
+        INPUT_ARGS: ${{ inputs.args }}
       run: |
         ARGS=()
+        COMMAND="$INPUT_COMMAND"
 
-        if [ "${{ inputs.changelog }}" == "true" ]; then
+        if [ "$INPUT_CHANGELOG" == "true" ]; then
           ARGS+=("--changelog")
         fi
 
-        if [ "${{ inputs.push }}" == "true" ]; then
+        if [ "$INPUT_PUSH" == "true" ]; then
           ARGS+=("--push")
         else
           ARGS+=("--no-push")
         fi
 
-        if [ -n "${{ inputs.remote }}" ]; then
-          ARGS+=("--remote" "${{ inputs.remote }}")
+        if [ -n "$INPUT_REMOTE" ]; then
+          ARGS+=("--remote" "$INPUT_REMOTE")
         fi
 
-        if [ -n "${{ inputs.commit_message }}" ]; then
-          ARGS+=("--commit-message" "${{ inputs.commit_message }}")
+        if [ -n "$INPUT_COMMIT_MESSAGE" ]; then
+          ARGS+=("--commit-message" "$INPUT_COMMIT_MESSAGE")
         fi
 
-        if [ -n "${{ inputs.commit_suffix }}" ]; then
-          ARGS+=("--commit-suffix" "${{ inputs.commit_suffix }}")
+        if [ -n "$INPUT_COMMIT_SUFFIX" ]; then
+          ARGS+=("--commit-suffix" "$INPUT_COMMIT_SUFFIX")
         fi
 
-        if [ -n "${{ inputs.version_file }}" ]; then
-          ARGS+=("--version-file" "${{ inputs.version_file }}")
+        if [ -n "$INPUT_VERSION_FILE" ]; then
+          ARGS+=("--version-file" "$INPUT_VERSION_FILE")
         fi
 
-        if [ "${{ inputs.dry_run }}" == "true" ]; then
+        if [ "$INPUT_DRY_RUN" == "true" ]; then
           ARGS+=("--dry-run")
         fi
 
-        if [ -n "${{ inputs.version_sync }}" ]; then
-          ARGS+=("--sync" "${{ inputs.version_sync }}")
+        if [ -n "$INPUT_VERSION_SYNC" ]; then
+          ARGS+=("--sync" "$INPUT_VERSION_SYNC")
         fi
 
-        PRERELEASE="${{ inputs.prerelease }}"
+        PRERELEASE="$INPUT_PRERELEASE"
         if [ "$PRERELEASE" == "true" ]; then
           REF_NAME="${GITHUB_REF_NAME:-}"
           CLEAN_TAG=$(echo "$REF_NAME" | sed 's/[^a-zA-Z0-9.-]/-/g')
@@ -138,12 +155,14 @@ runs:
           ARGS+=("--prerelease" "$PRERELEASE")
         fi
 
-        PROMOTE="${{ inputs.promote }}"
+        PROMOTE="$INPUT_PROMOTE"
         if [ "$PROMOTE" == "true" ]; then
           ARGS+=("--promote")
         elif [ "$PROMOTE" == "auto" ]; then
           if [ -z "$PRERELEASE" ] || [ "$PRERELEASE" == "false" ]; then
-            CHECK_JSON=$(foonver ${{ inputs.command }} --json --dry-run 2>/dev/null || true)
+            # Reuse the same flags the real run will use (e.g. --version-file)
+            # so version discovery matches between the probe and the real run.
+            CHECK_JSON=$(foonver "$COMMAND" "${ARGS[@]}" --json --dry-run 2>/dev/null || true)
             CURRENT_VER=$(echo "$CHECK_JSON" | jq -r '.current_version // empty')
             if [[ "$CURRENT_VER" =~ -[0-9A-Za-z] ]]; then
               ARGS+=("--promote")
@@ -151,13 +170,13 @@ runs:
           fi
         fi
 
-        if [ "${{ inputs.include_prereleases }}" == "true" ]; then
+        if [ "$INPUT_INCLUDE_PRERELEASES" == "true" ]; then
           ARGS+=("--include-prereleases")
         fi
 
-        if [ -n "${{ inputs.args }}" ]; then
+        if [ -n "$INPUT_ARGS" ]; then
           # Split args by space, but this is a best-effort for raw args string
-          read -ra EXTRA_ARGS <<< "${{ inputs.args }}"
+          read -ra EXTRA_ARGS <<< "$INPUT_ARGS"
           ARGS+=("${EXTRA_ARGS[@]}")
         fi
 
@@ -170,7 +189,7 @@ runs:
         # Run foonver with --json to get structured output
         # We also use --release-notes to a temporary file to capture the delta
         TEMP_NOTES=$(mktemp)
-        PLAN_JSON=$(foonver ${{ inputs.command }} "${ARGS[@]}" --json --release-notes "$TEMP_NOTES")
+        PLAN_JSON=$(foonver "$COMMAND" "${ARGS[@]}" --json --release-notes "$TEMP_NOTES")
         FOONVER_EXIT_CODE=$?
 
         if [ $FOONVER_EXIT_CODE -ne 0 ]; then
