@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.17.0 (2026-09-11)
+### 0.17.1 (2026-09-15)
+
+#### Bug Fixes
+
+- git: handle special characters in git status and prevent prefix stacking (009af87)
+- action: pass inputs via environment variables to prevent injection (fbcf9e7)
+
+## v0.17.0 (2026-09-11)
 
 #### Features
 
