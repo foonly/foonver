@@ -156,7 +156,7 @@ changelog = true
 # The name of the changelog file
 file = "CHANGELOG.md"
 
-# Synchronize version in other files (finds first mention with "version", "v", "ver", or "stable tag" prefix)
+# Synchronize version in other files (replaces every mention with "version", "v", "ver", or "stable tag" prefix)
 version-sync = ["README.md", "docs/install.md"]
 
 # Default prerelease tag identifier (e.g., "beta", "rc")

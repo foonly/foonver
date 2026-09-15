@@ -53,7 +53,9 @@ func GenerateMarkdown(nextVersion string, latestOnly bool) (string, error) {
 		if err2 == nil {
 			return true
 		}
-		return i < j
+		// Neither parses as semver: leave their relative order untouched
+		// (SliceStable already preserves the original order for ties).
+		return false
 	})
 
 	var b strings.Builder
@@ -264,7 +266,7 @@ func renderGroupedCommits(b *strings.Builder, commits []string) {
 	sort.Strings(remaining)
 	for _, t := range remaining {
 		title := strings.ToUpper(t[:1]) + t[1:]
-		b.WriteString("### " + title + "\n")
+		b.WriteString("#### " + title + "\n\n")
 		for _, item := range groups[t] {
 			b.WriteString("- " + item + "\n")
 		}
@@ -273,7 +275,7 @@ func renderGroupedCommits(b *strings.Builder, commits []string) {
 
 	// Misc last
 	if items, ok := groups["misc"]; ok {
-		b.WriteString("### Misc\n")
+		b.WriteString("#### Misc\n\n")
 		for _, item := range items {
 			b.WriteString("- " + item + "\n")
 		}

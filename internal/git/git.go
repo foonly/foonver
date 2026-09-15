@@ -106,24 +106,30 @@ func IsClean() bool {
 
 // GetDirtyFiles returns a list of tracked files with uncommitted changes.
 func GetDirtyFiles() []string {
-	output, err := runGit("status", "--porcelain", "--untracked-files=no")
+	// Use -z (NUL-separated, unquoted paths) instead of the default porcelain
+	// format so filenames with spaces, quotes, or non-ASCII bytes come back
+	// as raw bytes instead of being C-quoted/escaped by git.
+	output, err := runGit("status", "--porcelain", "-z", "--untracked-files=no")
 	if err != nil {
 		return nil
 	}
-	raw := strings.Split(strings.ReplaceAll(output, "\r\n", "\n"), "\n")
-	files := make([]string, 0, len(raw))
-	for _, line := range raw {
-		if len(line) <= 3 {
+
+	fields := strings.Split(output, "\x00")
+	files := make([]string, 0, len(fields))
+	for i := 0; i < len(fields); i++ {
+		entry := fields[i]
+		if entry == "" || len(entry) < 3 {
 			continue
 		}
-		filePath := strings.TrimSpace(line[3:])
-		if strings.Contains(filePath, " -> ") {
-			parts := strings.Split(filePath, " -> ")
-			filePath = parts[len(parts)-1]
-		}
-		filePath = strings.Trim(filePath, "\"")
-		if filePath != "" {
-			files = append(files, filePath)
+		status := entry[:2]
+		filePath := entry[3:]
+		files = append(files, filePath)
+
+		// Renamed/copied entries carry an extra NUL-terminated field with the
+		// original path immediately after; skip it since we only want the
+		// current path.
+		if strings.ContainsAny(status, "RC") {
+			i++
 		}
 	}
 	return files
@@ -153,9 +159,13 @@ func CommitAndTag(filenames []string, version string) error {
 		}
 	}
 
-	// Append the prefix to version if it's not already there.
+	// Append the prefix to version if it's not already there. A version that
+	// already starts with a non-digit (e.g. a literal "v" preserved from the
+	// version file) is assumed to already carry its own prefix, so we don't
+	// stack the configured prefix on top of it.
 	versionString := version
-	if config.Conf.Prefix != "" && !strings.HasPrefix(version, config.Conf.Prefix) {
+	alreadyPrefixed := version == "" || version[0] < '0' || version[0] > '9'
+	if config.Conf.Prefix != "" && !strings.HasPrefix(version, config.Conf.Prefix) && !alreadyPrefixed {
 		versionString = fmt.Sprintf("%s%s", config.Conf.Prefix, version)
 	}
 

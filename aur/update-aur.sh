@@ -29,7 +29,7 @@ SOURCE_URL="https://github.com/foonly/foonver/archive/refs/tags/v${VERSION}.tar.
 TEMP_FILE=$(mktemp)
 
 echo "Downloading ${SOURCE_URL}..."
-if ! curl -sL "$SOURCE_URL" -o "$TEMP_FILE"; then
+if ! curl -sSLf "$SOURCE_URL" -o "$TEMP_FILE"; then
     echo "Error: Failed to download source from $SOURCE_URL"
     rm -f "$TEMP_FILE"
     exit 1

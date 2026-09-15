@@ -156,6 +156,40 @@ func TestCommitAndTag_DoublePrefix(t *testing.T) {
 	}
 }
 
+func TestCommitAndTag_MismatchedPrefix(t *testing.T) {
+	dir := setupTestRepo(t)
+	defer os.RemoveAll(dir)
+
+	oldRoot := config.Conf.Info.RootDir
+	oldPrefix := config.Conf.Prefix
+	oldCwd, _ := os.Getwd()
+	config.Conf.Info.RootDir = dir
+	config.Conf.Prefix = "rel-"
+	os.Chdir(dir)
+	defer func() {
+		config.Conf.Info.RootDir = oldRoot
+		config.Conf.Prefix = oldPrefix
+		os.Chdir(oldCwd)
+	}()
+
+	// The version already carries its own "v" prefix (e.g. preserved from a
+	// version file) that doesn't match the configured tag prefix. The tag
+	// must not become the malformed "rel-v1.2.0".
+	version := "v1.2.0"
+	if err := CommitAndTag([]string{}, version); err != nil {
+		t.Fatalf("CommitAndTag failed: %v", err)
+	}
+
+	out, err := runGit("tag", "-l")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tags := strings.Fields(out)
+	if len(tags) != 1 || tags[0] != "v1.2.0" {
+		t.Errorf("expected exactly tag v1.2.0, got: %v", tags)
+	}
+}
+
 func TestExitCode(t *testing.T) {
 	// Note: We can't easily test the actual exit code value without a real process,
 	// but we can verify the Unwrap logic works.
@@ -218,5 +252,82 @@ func TestGetDirtyFiles(t *testing.T) {
 		if !expected[f] {
 			t.Errorf("unexpected dirty file %q (expected one of consts.php, readme.txt)", f)
 		}
+	}
+}
+
+func TestGetDirtyFiles_SpecialCharacters(t *testing.T) {
+	dir := setupTestRepo(t)
+	defer os.RemoveAll(dir)
+
+	oldRoot := config.Conf.Info.RootDir
+	oldCwd, _ := os.Getwd()
+	config.Conf.Info.RootDir = dir
+	os.Chdir(dir)
+	defer func() {
+		config.Conf.Info.RootDir = oldRoot
+		os.Chdir(oldCwd)
+	}()
+
+	// Git C-quotes filenames with spaces or special characters in the
+	// default porcelain output; these names must survive intact.
+	file1 := "file with space.txt"
+	file2 := `weird"name.txt`
+	for _, f := range []string{file1, file2} {
+		if err := os.WriteFile(filepath.Join(dir, f), []byte("v1"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runGit("add", file1, file2)
+	runGit("commit", "-m", "add special files")
+
+	for _, f := range []string{file1, file2} {
+		if err := os.WriteFile(filepath.Join(dir, f), []byte("v2"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	dirty := GetDirtyFiles()
+	expected := map[string]bool{file1: true, file2: true}
+	if len(dirty) != len(expected) {
+		t.Fatalf("expected %d dirty files, got %d: %v", len(expected), len(dirty), dirty)
+	}
+	for _, f := range dirty {
+		if !expected[f] {
+			t.Errorf("unexpected dirty file %q", f)
+		}
+	}
+}
+
+func TestGetDirtyFiles_Rename(t *testing.T) {
+	dir := setupTestRepo(t)
+	defer os.RemoveAll(dir)
+
+	oldRoot := config.Conf.Info.RootDir
+	oldCwd, _ := os.Getwd()
+	config.Conf.Info.RootDir = dir
+	os.Chdir(dir)
+	defer func() {
+		config.Conf.Info.RootDir = oldRoot
+		os.Chdir(oldCwd)
+	}()
+
+	oldName := "old-name.txt"
+	newName := "new-name.txt"
+	// Content needs to be long enough for git's rename detection to kick in.
+	content := strings.Repeat("hello world\n", 20)
+	if err := os.WriteFile(filepath.Join(dir, oldName), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	runGit("add", oldName)
+	runGit("commit", "-m", "add file")
+
+	if err := os.Rename(filepath.Join(dir, oldName), filepath.Join(dir, newName)); err != nil {
+		t.Fatal(err)
+	}
+	runGit("add", "-A")
+
+	dirty := GetDirtyFiles()
+	if len(dirty) != 1 || dirty[0] != newName {
+		t.Errorf("expected only %q, got %v", newName, dirty)
 	}
 }
