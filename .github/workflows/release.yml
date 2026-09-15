@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - beta
       - "push-action/**"
 
 jobs:
@@ -35,6 +36,7 @@ jobs:
           command: "auto"
           changelog: "true"
           push: "true"
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
           version_sync: "README.md"
           remote: ""
 
