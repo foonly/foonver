@@ -310,7 +310,7 @@ func TestGenerateMarkdown_Prerelease(t *testing.T) {
 
 	t.Run("wordpress format generation and writing", func(t *testing.T) {
 		config.Conf.ChangelogFormat = "wordpress"
-		config.Conf.File = "readme.txt"
+		config.Conf.ChangelogFile = "readme.txt"
 		config.Conf.ChangelogStart = "== Changelog =="
 		config.Conf.ChangelogEnd = "== Upgrade Notice =="
 

@@ -17,7 +17,7 @@ var configCommand = &cobra.Command{
 		fmt.Printf("Verbosity: %s\n", config.Conf.Verbosity)
 		fmt.Printf("Parser: %s\n", config.Conf.Parser)
 		fmt.Printf("Changelog: %v\n", config.Conf.Changelog)
-		fmt.Printf("File: %s\n", config.Conf.File)
+		fmt.Printf("Changelog File: %s\n", config.Conf.ChangelogFile)
 		fmt.Printf("Changelog Format: %s\n", config.Conf.ChangelogFormat)
 		fmt.Printf("Changelog Start: %s\n", config.Conf.ChangelogStart)
 		fmt.Printf("Changelog End: %s\n", config.Conf.ChangelogEnd)

@@ -253,7 +253,7 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 	if config.Conf.Changelog {
 		plan.Steps = append(plan.Steps, PlanStep{
 			Type:        StepUpdateChangelog,
-			Description: fmt.Sprintf("Update changelog: %s", config.Conf.File),
+			Description: fmt.Sprintf("Update changelog: %s", config.Conf.ChangelogFile),
 			Action: func() error {
 				_, err := changelog.WriteChangelog(nextVersionStr)
 				return err
@@ -292,7 +292,7 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 				files = append(files, path.Join(config.Conf.Info.RootDir, syncFile))
 			}
 			if config.Conf.Changelog {
-				changelogPath := path.Join(config.Conf.Info.RootDir, config.Conf.File)
+				changelogPath := path.Join(config.Conf.Info.RootDir, config.Conf.ChangelogFile)
 				files = append(files, changelogPath)
 			}
 			return git.CommitAndTag(files, nextVersionStr)

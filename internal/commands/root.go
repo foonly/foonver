@@ -28,6 +28,7 @@ var (
 	flagPrerelease         string
 	flagPromote            bool
 	flagIncludePrereleases bool
+	flagChangelogFile      string
 	flagChangelogFormat    string
 	flagChangelogStart     string
 	flagChangelogEnd       string
@@ -69,6 +70,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flagPrerelease, "prerelease", "", "set or switch prerelease identifier (e.g. alpha, beta, rc)")
 	rootCmd.PersistentFlags().BoolVar(&flagPromote, "promote", false, "promote prerelease version to stable release")
 	rootCmd.PersistentFlags().BoolVar(&flagIncludePrereleases, "include-prereleases", false, "include prerelease versions in changelog")
+	rootCmd.PersistentFlags().StringVar(&flagChangelogFile, "changelog-file", "", "the name of the changelog file (defaults to CHANGELOG.md)")
 	rootCmd.PersistentFlags().StringVar(&flagChangelogFormat, "changelog-format", "", "format for changelog (markdown, wordpress)")
 	rootCmd.PersistentFlags().StringVar(&flagChangelogStart, "changelog-start", "", "start pattern marker in changelog file")
 	rootCmd.PersistentFlags().StringVar(&flagChangelogEnd, "changelog-end", "", "end pattern marker in changelog file")
@@ -95,6 +97,7 @@ func init() {
 	viper.BindPFlag("prerelease", rootCmd.PersistentFlags().Lookup("prerelease"))
 	viper.BindPFlag("promote", rootCmd.PersistentFlags().Lookup("promote"))
 	viper.BindPFlag("include-prereleases", rootCmd.PersistentFlags().Lookup("include-prereleases"))
+	viper.BindPFlag("changelog-file", rootCmd.PersistentFlags().Lookup("changelog-file"))
 	viper.BindPFlag("changelog-format", rootCmd.PersistentFlags().Lookup("changelog-format"))
 	viper.BindPFlag("changelog-start", rootCmd.PersistentFlags().Lookup("changelog-start"))
 	viper.BindPFlag("changelog-end", rootCmd.PersistentFlags().Lookup("changelog-end"))

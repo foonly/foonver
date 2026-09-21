@@ -77,7 +77,7 @@ type Config struct {
 	Verbosity          Level    `mapstructure:"verbosity"`
 	Parser             string   `mapstructure:"parser"`
 	Changelog          bool     `mapstructure:"changelog"`
-	File               string   `mapstructure:"file"`
+	ChangelogFile      string   `mapstructure:"changelog-file"`
 	ChangelogFormat    string   `mapstructure:"changelog-format"`
 	ChangelogStart     string   `mapstructure:"changelog-start"`
 	ChangelogEnd       string   `mapstructure:"changelog-end"`
@@ -110,7 +110,7 @@ func Init() {
 	viper.SetDefault("verbosity", "normal")
 	viper.SetDefault("parser", "all")
 	viper.SetDefault("changelog", false)
-	viper.SetDefault("file", "CHANGELOG.md")
+	viper.SetDefault("changelog-file", "CHANGELOG.md")
 	viper.SetDefault("changelog-format", "markdown")
 	viper.SetDefault("changelog-start", "")
 	viper.SetDefault("changelog-end", "")
@@ -211,8 +211,10 @@ func processFlags() {
 		Conf.Changelog = true
 	}
 
-	if viper.IsSet("file") {
-		Conf.File = viper.GetString("file")
+	if viper.IsSet("changelog-file") {
+		Conf.ChangelogFile = viper.GetString("changelog-file")
+	} else if viper.IsSet("file") {
+		Conf.ChangelogFile = viper.GetString("file")
 	}
 
 	if viper.IsSet("changelog-format") {

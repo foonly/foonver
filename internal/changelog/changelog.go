@@ -243,7 +243,7 @@ func WriteChangelog(nextVersion string) (string, error) {
 		return "", err
 	}
 
-	filePath := path.Join(config.Conf.Info.RootDir, config.Conf.File)
+	filePath := path.Join(config.Conf.Info.RootDir, config.Conf.ChangelogFile)
 	startPattern := config.Conf.ChangelogStart
 	endPattern := config.Conf.ChangelogEnd
 

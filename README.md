@@ -15,7 +15,10 @@ Version 0.17.2-beta.1
   - Validates repository state before mutating.
   - Creates dedicated version-bump commits and tags.
   - Optional automatic pushing of tags and commits to a configurable remote.
-- **Changelog Management**: Categorizes commits and automatically updates `CHANGELOG.md`.
+- **Changelog Management**:
+  - Categorizes commits and automatically updates `CHANGELOG.md` (or any custom file).
+  - Multiple formats: Standard **Markdown** and **WordPress `readme.txt`** syntax.
+  - Pattern-based insertion: Append or replace changelog sections inside existing files (e.g., between `== Changelog ==` and `== Upgrade Notice ==`) using start and optional end patterns.
   - Automatically filters out version-only commits and those containing `[skip ci]` or `[skip action]`.
 - **Prerelease Support**: Create and manage prerelease cycles (`alpha`, `beta`, `rc`, etc.) with automatic counter increments, tag transitions, promotion to stable, and smart changelog aggregation.
 
@@ -97,6 +100,26 @@ Use the `--dry-run` flag to see the calculated version and the list of commits b
 foonver auto --dry-run
 ```
 
+### Changelog Generation & Formats
+
+Generate changelogs on-demand with the `changelog` command:
+
+```bash
+# Print full markdown changelog
+foonver changelog
+
+# Print only the latest version section
+foonver changelog --latest
+
+# Generate in WordPress readme.txt format
+foonver changelog --format wordpress
+```
+
+Supported formats:
+
+- `markdown` (default): Standard GitHub-flavored Markdown.
+- `wordpress` (aliases: `wp`, `readme`): WordPress plugin `readme.txt` changelog syntax (`= 1.0.0 =`, `* Feature: ...`).
+
 ### Custom Commit Messages
 
 Customize the version bump commit message or append a suffix:
@@ -153,8 +176,17 @@ version-file = "version.json"
 # Automatically update the changelog file
 changelog = true
 
-# The name of the changelog file
-file = "CHANGELOG.md"
+# The name of the changelog file (e.g. CHANGELOG.md or readme.txt)
+changelog-file = "CHANGELOG.md"
+
+# Changelog format: markdown (default) or wordpress
+changelog-format = "markdown"
+
+# Optional start marker pattern to insert changelog into an existing file
+# changelog-start = "== Changelog =="
+
+# Optional end marker pattern (if omitted and changelog-start is set, overwrites to the end of the file)
+# changelog-end = "== Upgrade Notice =="
 
 # Synchronize version in other files (replaces every mention with "version", "v", "ver", or "stable tag" prefix)
 version-sync = ["README.md", "docs/install.md"]
