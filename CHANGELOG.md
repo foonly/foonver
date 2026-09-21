@@ -1,6 +1,6 @@
 # Changelog
 
-### 0.18.0-beta.1 (2026-09-21)
+### 0.18.0-beta.2 (2026-09-21)
 
 #### Features
 
@@ -300,3 +300,4 @@
 #### Features
 
 - Drew the rest of the owl. (0567ada)
+
