@@ -1,6 +1,20 @@
 # Changelog
 
-### 0.17.2 (2026-09-15)
+### 0.18.0-beta.2 (2026-09-21)
+
+#### Features
+
+- changelog: add WordPress format support (dc14913)
+
+#### Bug Fixes
+
+- changelog: remove commit hashes from WordPress formatter output (c46f85a)
+
+#### Refactor
+
+- config: rename file config option to changelog-file (b3564bc)
+
+### v0.17.2 (2026-09-15)
 
 #### Continuous Integration
 
