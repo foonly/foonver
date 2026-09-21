@@ -300,4 +300,3 @@
 #### Features
 
 - Drew the rest of the owl. (0567ada)
-
