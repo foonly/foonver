@@ -167,10 +167,10 @@ func TestWordPressFormatter(t *testing.T) {
 	group := wp.FormatGroup("v1.0.0", "2026-09-21", commits)
 	expectedLines := []string{
 		"= v1.0.0 (2026-09-21) =",
-		"* Feature: core: major feature (BREAKING CHANGE) (abc1234)",
-		"* Fix: resolve bug (def5678)",
-		"* Custom: something special (ghi9012)",
-		"* misc non-conventional message (jkl3456)",
+		"* Feature: core - major feature (BREAKING CHANGE)",
+		"* Fix: resolve bug",
+		"* Custom: something special",
+		"* misc non-conventional message",
 	}
 
 	for _, line := range expectedLines {

@@ -208,14 +208,14 @@ func renderGroupedCommitsWordPress(b *strings.Builder, commits []string) {
 			scp := ""
 			msg := info.Message
 			if info.Scope != "" {
-				scp = fmt.Sprintf("%s: ", info.Scope)
+				scp = fmt.Sprintf("%s - ", info.Scope)
 			}
 			if info.Breaking {
 				msg += " (BREAKING CHANGE)"
 			}
-			groups[info.Type] = append(groups[info.Type], fmt.Sprintf("* %s: %s%s (%s)", prefix, scp, msg, info.Hash))
+			groups[info.Type] = append(groups[info.Type], fmt.Sprintf("* %s: %s%s", prefix, scp, msg))
 		} else {
-			groups["misc"] = append(groups["misc"], fmt.Sprintf("* %s (%s)", info.Message, info.Hash))
+			groups["misc"] = append(groups["misc"], fmt.Sprintf("* %s", info.Message))
 		}
 	}
 
