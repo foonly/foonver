@@ -10,6 +10,7 @@ import (
 
 var flagNext string
 var flagLatest bool
+var flagFormat string
 
 var changelogCommand = &cobra.Command{
 	Use:   "changelog",
@@ -19,12 +20,17 @@ var changelogCommand = &cobra.Command{
 			return fmt.Errorf("not inside a Git repository")
 		}
 
-		md, err := changelog.GenerateMarkdown(flagNext, flagLatest)
+		format := flagFormat
+		if format == "" {
+			format = config.Conf.ChangelogFormat
+		}
+
+		content, err := changelog.Generate(format, flagNext, flagLatest)
 		if err != nil {
 			return err
 		}
 
-		fmt.Fprint(cmd.OutOrStdout(), md)
+		fmt.Fprint(cmd.OutOrStdout(), content)
 		return nil
 	},
 }
@@ -32,5 +38,6 @@ var changelogCommand = &cobra.Command{
 func init() {
 	changelogCommand.Flags().StringVar(&flagNext, "next", "", "Next version name (e.g. v1.0.0 or Unreleased)")
 	changelogCommand.Flags().BoolVar(&flagLatest, "latest", false, "Only output the latest version section")
+	changelogCommand.Flags().StringVarP(&flagFormat, "format", "f", "", "Changelog format (markdown, wordpress)")
 	rootCmd.AddCommand(changelogCommand)
 }

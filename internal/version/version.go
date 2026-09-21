@@ -266,11 +266,15 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 			Type:        StepWriteReleaseNotes,
 			Description: fmt.Sprintf("Write release notes: %s", config.Conf.ReleaseNotes),
 			Action: func() error {
-				md, err := changelog.GenerateMarkdown(nextVersionStr, true)
+				format := config.Conf.ChangelogFormat
+				if format == "" {
+					format = "markdown"
+				}
+				content, err := changelog.Generate(format, nextVersionStr, true)
 				if err != nil {
 					return err
 				}
-				return os.WriteFile(config.Conf.ReleaseNotes, []byte(md), 0644)
+				return os.WriteFile(config.Conf.ReleaseNotes, []byte(content), 0644)
 			},
 		})
 	}

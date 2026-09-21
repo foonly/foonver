@@ -3,6 +3,7 @@ package changelog
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -95,6 +96,87 @@ func TestIsPrerelease(t *testing.T) {
 				t.Errorf("isPrerelease(%q) = %v, want %v", tt.tag, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestInjectChangelog(t *testing.T) {
+	t.Run("start pattern only", func(t *testing.T) {
+		existing := "=== Plugin Name ===\n== Description ==\nDescription here\n== Changelog ==\n= 0.9.0 =\n* Initial release\n"
+		changelog := "= 1.0.0 =\n* Feature: new feature (abc1234)\n\n= 0.9.0 =\n* Initial release"
+		start := "== Changelog =="
+
+		got, err := InjectChangelog(existing, changelog, start, "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		expected := "=== Plugin Name ===\n== Description ==\nDescription here\n== Changelog ==\n\n= 1.0.0 =\n* Feature: new feature (abc1234)\n\n= 0.9.0 =\n* Initial release\n"
+		if got != expected {
+			t.Errorf("InjectChangelog mismatch.\nGot:\n%q\nExpected:\n%q", got, expected)
+		}
+	})
+
+	t.Run("start and end pattern", func(t *testing.T) {
+		existing := "=== Plugin Name ===\n== Changelog ==\n= 0.9.0 =\n* Initial release\n== Upgrade Notice ==\n= 1.0.0 =\nUpgrade now!\n"
+		changelog := "= 1.0.0 =\n* Feature: new feature (abc1234)\n\n= 0.9.0 =\n* Initial release"
+		start := "== Changelog =="
+		end := "== Upgrade Notice =="
+
+		got, err := InjectChangelog(existing, changelog, start, end)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		expected := "=== Plugin Name ===\n== Changelog ==\n\n= 1.0.0 =\n* Feature: new feature (abc1234)\n\n= 0.9.0 =\n* Initial release\n\n== Upgrade Notice ==\n= 1.0.0 =\nUpgrade now!\n"
+		if got != expected {
+			t.Errorf("InjectChangelog mismatch.\nGot:\n%q\nExpected:\n%q", got, expected)
+		}
+	})
+
+	t.Run("start pattern not found", func(t *testing.T) {
+		existing := "=== Plugin Name ===\nNo changelog header\n"
+		_, err := InjectChangelog(existing, "changelog", "== Changelog ==", "")
+		if err == nil {
+			t.Error("expected error when start pattern is missing, got nil")
+		}
+	})
+
+	t.Run("end pattern not found", func(t *testing.T) {
+		existing := "=== Plugin Name ===\n== Changelog ==\nOld stuff\n"
+		_, err := InjectChangelog(existing, "changelog", "== Changelog ==", "== Upgrade Notice ==")
+		if err == nil {
+			t.Error("expected error when end pattern is missing after start pattern, got nil")
+		}
+	})
+}
+
+func TestWordPressFormatter(t *testing.T) {
+	wp := &WordPressFormatter{}
+
+	if header := wp.DocumentHeader(); header != "== Changelog ==\n\n" {
+		t.Errorf("unexpected document header: %q", header)
+	}
+
+	commits := []string{
+		"abc1234 feat(core)!: major feature",
+		"def5678 fix: resolve bug",
+		"ghi9012 custom: something special",
+		"jkl3456 misc non-conventional message",
+	}
+
+	group := wp.FormatGroup("v1.0.0", "2026-09-21", commits)
+	expectedLines := []string{
+		"= v1.0.0 (2026-09-21) =",
+		"* Feature: core: major feature (BREAKING CHANGE) (abc1234)",
+		"* Fix: resolve bug (def5678)",
+		"* Custom: something special (ghi9012)",
+		"* misc non-conventional message (jkl3456)",
+	}
+
+	for _, line := range expectedLines {
+		if !strings.Contains(group, line) {
+			t.Errorf("expected line %q in group output:\n%s", line, group)
+		}
 	}
 }
 
@@ -223,6 +305,49 @@ func TestGenerateMarkdown_Prerelease(t *testing.T) {
 		}
 		if !strings.Contains(md, "v1.1.0-beta.1") {
 			t.Errorf("expected v1.1.0-beta.1 with include-prereleases, got:\n%s", md)
+		}
+	})
+
+	t.Run("wordpress format generation and writing", func(t *testing.T) {
+		config.Conf.ChangelogFormat = "wordpress"
+		config.Conf.File = "readme.txt"
+		config.Conf.ChangelogStart = "== Changelog =="
+		config.Conf.ChangelogEnd = "== Upgrade Notice =="
+
+		readmePath := filepath.Join(dir, "readme.txt")
+		initialReadme := "=== My Plugin ===\n== Changelog ==\n= 0.1.0 =\n* Initial\n== Upgrade Notice ==\nUpgrade!\n"
+		if err := os.WriteFile(readmePath, []byte(initialReadme), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		writtenPath, err := WriteChangelog("v1.2.0")
+		if err != nil {
+			t.Fatalf("WriteChangelog failed: %v", err)
+		}
+		if writtenPath != readmePath {
+			t.Errorf("expected written path %q, got %q", readmePath, writtenPath)
+		}
+
+		content, err := os.ReadFile(readmePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		strContent := string(content)
+
+		if !strings.Contains(strContent, "=== My Plugin ===") {
+			t.Errorf("expected header preserved in readme, got:\n%s", strContent)
+		}
+		if !strings.Contains(strContent, "== Changelog ==") {
+			t.Errorf("expected changelog start marker preserved, got:\n%s", strContent)
+		}
+		if !strings.Contains(strContent, "= v1.2.0") {
+			t.Errorf("expected v1.2.0 in wordpress changelog, got:\n%s", strContent)
+		}
+		if !strings.Contains(strContent, "* Fix: unreleased fix") {
+			t.Errorf("expected '* Fix: unreleased fix' in changelog, got:\n%s", strContent)
+		}
+		if !strings.Contains(strContent, "== Upgrade Notice ==\nUpgrade!\n") {
+			t.Errorf("expected upgrade notice preserved, got:\n%s", strContent)
 		}
 	})
 }

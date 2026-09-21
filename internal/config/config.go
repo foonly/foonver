@@ -78,6 +78,9 @@ type Config struct {
 	Parser             string   `mapstructure:"parser"`
 	Changelog          bool     `mapstructure:"changelog"`
 	File               string   `mapstructure:"file"`
+	ChangelogFormat    string   `mapstructure:"changelog-format"`
+	ChangelogStart     string   `mapstructure:"changelog-start"`
+	ChangelogEnd       string   `mapstructure:"changelog-end"`
 	VersionSync        []string `mapstructure:"version-sync"`
 	ReleaseNotes       string   `mapstructure:"release-notes"`
 	PrintVersion       bool     `mapstructure:"print-version"`
@@ -108,6 +111,9 @@ func Init() {
 	viper.SetDefault("parser", "all")
 	viper.SetDefault("changelog", false)
 	viper.SetDefault("file", "CHANGELOG.md")
+	viper.SetDefault("changelog-format", "markdown")
+	viper.SetDefault("changelog-start", "")
+	viper.SetDefault("changelog-end", "")
 	viper.SetDefault("version-sync", []string{})
 	viper.SetDefault("release-notes", "")
 	viper.SetDefault("print-version", false)
@@ -203,6 +209,22 @@ func processFlags() {
 
 	if viper.IsSet("changelog") && viper.GetBool("changelog") {
 		Conf.Changelog = true
+	}
+
+	if viper.IsSet("file") {
+		Conf.File = viper.GetString("file")
+	}
+
+	if viper.IsSet("changelog-format") {
+		Conf.ChangelogFormat = viper.GetString("changelog-format")
+	}
+
+	if viper.IsSet("changelog-start") {
+		Conf.ChangelogStart = viper.GetString("changelog-start")
+	}
+
+	if viper.IsSet("changelog-end") {
+		Conf.ChangelogEnd = viper.GetString("changelog-end")
 	}
 
 	if viper.IsSet("version-sync") {

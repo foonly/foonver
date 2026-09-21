@@ -14,6 +14,32 @@ import (
 	"github.com/foonly/foonver/internal/git"
 )
 
+var findVer = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`)
+var typeRegex = regexp.MustCompile(`(?i)^([a-z]+)(?:\((.*)\))?(!)?:\s*(.*)$`)
+
+var typeTitles = map[string]string{
+	"feat":     "Features",
+	"fix":      "Bug Fixes",
+	"revert":   "Reverts",
+	"chore":    "Maintenance",
+	"docs":     "Documentation",
+	"style":    "Styles",
+	"refactor": "Refactor",
+	"perf":     "Performance Improvements",
+	"test":     "Tests",
+	"build":    "Build System",
+	"ci":       "Continuous Integration",
+}
+
+// Generate builds a changelog in the specified format from git tags and commits.
+func Generate(format string, nextVersion string, latestOnly bool) (string, error) {
+	formatter, err := GetFormatter(format)
+	if err != nil {
+		return "", err
+	}
+	return GenerateWithFormatter(formatter, nextVersion, latestOnly, !latestOnly)
+}
+
 // GenerateMarkdown builds a changelog in Markdown from git tags and commits.
 //
 // Output format:
@@ -36,6 +62,11 @@ import (
 // The first tag includes all commits reachable from that tag.
 // If there are commits since the last tag, they are grouped under nextVersion (or "Unreleased" if empty).
 func GenerateMarkdown(nextVersion string, latestOnly bool) (string, error) {
+	return Generate("markdown", nextVersion, latestOnly)
+}
+
+// GenerateWithFormatter builds a changelog using the given Formatter.
+func GenerateWithFormatter(formatter Formatter, nextVersion string, latestOnly bool, includeDocHeader bool) (string, error) {
 	tags, err := git.GetTags()
 	if err != nil {
 		return "", err
@@ -59,8 +90,8 @@ func GenerateMarkdown(nextVersion string, latestOnly bool) (string, error) {
 	})
 
 	var b strings.Builder
-	if !latestOnly {
-		b.WriteString("# Changelog\n\n")
+	if includeDocHeader {
+		b.WriteString(formatter.DocumentHeader())
 	}
 
 	includePrereleases := config.Conf.IncludePrereleases
@@ -99,7 +130,7 @@ func GenerateMarkdown(nextVersion string, latestOnly bool) (string, error) {
 		if title == "" {
 			title = "Unreleased"
 		}
-		group, err := generateGroup("", title, "")
+		group, err := generateGroup(formatter, "", title, "")
 		if err != nil {
 			return "", err
 		}
@@ -119,7 +150,7 @@ func GenerateMarkdown(nextVersion string, latestOnly bool) (string, error) {
 	}
 	unreleasedCommits, err := filteredCommits(fmt.Sprintf("%s..HEAD", lastRenderedTag.Name), title)
 	if err == nil && len(unreleasedCommits) > 0 {
-		group, err := generateGroup(fmt.Sprintf("%s..HEAD", lastRenderedTag.Name), title, dateNow)
+		group, err := generateGroup(formatter, fmt.Sprintf("%s..HEAD", lastRenderedTag.Name), title, dateNow)
 		if err == nil {
 			b.WriteString(group)
 			if latestOnly {
@@ -140,7 +171,7 @@ func GenerateMarkdown(nextVersion string, latestOnly bool) (string, error) {
 			prev := renderedTags[i-1]
 			revRange = fmt.Sprintf("%s..%s", prev.Name, tag.Name)
 		}
-		group, err := generateGroup(revRange, tag.Name, tag.Date)
+		group, err := generateGroup(formatter, revRange, tag.Name, tag.Date)
 		if err != nil {
 			return "", err
 		}
@@ -162,125 +193,100 @@ func isPrerelease(tagName string) bool {
 	return v.Prerelease() != ""
 }
 
-// WriteChangelog generates the markdown and writes it to the configured file.
+// InjectChangelog replaces the changelog section in existing content bounded by startPattern and optional endPattern.
+func InjectChangelog(existing string, changelog string, startPattern string, endPattern string) (string, error) {
+	startIdx := strings.Index(existing, startPattern)
+	if startIdx == -1 {
+		return "", fmt.Errorf("start pattern %q not found in content", startPattern)
+	}
+
+	afterStartIdx := startIdx + len(startPattern)
+	lineEndIdx := strings.IndexByte(existing[afterStartIdx:], '\n')
+	if lineEndIdx != -1 {
+		afterStartIdx += lineEndIdx + 1
+	} else {
+		afterStartIdx = len(existing)
+	}
+
+	before := strings.TrimRight(existing[:afterStartIdx], "\r\n")
+	trimmedChangelog := strings.TrimSpace(changelog)
+
+	if endPattern == "" {
+		if trimmedChangelog == "" {
+			return before + "\n", nil
+		}
+		return before + "\n\n" + trimmedChangelog + "\n", nil
+	}
+
+	rest := existing[afterStartIdx:]
+	endIdx := strings.Index(rest, endPattern)
+	if endIdx == -1 {
+		return "", fmt.Errorf("end pattern %q not found after start pattern in content", endPattern)
+	}
+
+	after := strings.TrimLeft(rest[endIdx:], "\r\n")
+
+	if trimmedChangelog == "" {
+		return before + "\n\n" + after, nil
+	}
+	return before + "\n\n" + trimmedChangelog + "\n\n" + after, nil
+}
+
+// WriteChangelog generates the changelog and writes or injects it into the configured file.
 func WriteChangelog(nextVersion string) (string, error) {
-	md, err := GenerateMarkdown(nextVersion, false)
+	format := config.Conf.ChangelogFormat
+	if format == "" {
+		format = "markdown"
+	}
+	formatter, err := GetFormatter(format)
 	if err != nil {
 		return "", err
 	}
 
 	filePath := path.Join(config.Conf.Info.RootDir, config.Conf.File)
-	if err := os.WriteFile(filePath, []byte(md), 0644); err != nil {
+	startPattern := config.Conf.ChangelogStart
+	endPattern := config.Conf.ChangelogEnd
+
+	if startPattern == "" {
+		content, err := GenerateWithFormatter(formatter, nextVersion, false, true)
+		if err != nil {
+			return "", err
+		}
+		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+			return "", fmt.Errorf("failed to write changelog to %s: %w", filePath, err)
+		}
+		return filePath, nil
+	}
+
+	existingBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read changelog file %s for pattern replacement: %w", filePath, err)
+	}
+
+	changelogContent, err := GenerateWithFormatter(formatter, nextVersion, false, false)
+	if err != nil {
+		return "", err
+	}
+
+	updatedContent, err := InjectChangelog(string(existingBytes), changelogContent, startPattern, endPattern)
+	if err != nil {
+		return "", fmt.Errorf("failed to update changelog in %s: %w", filePath, err)
+	}
+
+	if err := os.WriteFile(filePath, []byte(updatedContent), 0644); err != nil {
 		return "", fmt.Errorf("failed to write changelog to %s: %w", filePath, err)
 	}
 
 	return filePath, nil
 }
 
-func generateGroup(revRange string, name string, date string) (string, error) {
+func generateGroup(formatter Formatter, revRange string, name string, date string) (string, error) {
 	commits, err := filteredCommits(revRange, name)
 	if err != nil {
 		return "", err
 	}
 
-	var b strings.Builder
-	title := name
-	lvl := "### "
-	if strings.HasSuffix(name, ".0") {
-		lvl = "## "
-	}
-
-	if date != "" {
-		title = fmt.Sprintf("%s (%s)", name, date)
-	}
-	b.WriteString(lvl + title + "\n\n")
-	if len(commits) > 0 {
-		renderGroupedCommits(&b, commits)
-	}
-	return b.String(), nil
-}
-
-var findVer = regexp.MustCompile(`^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$`)
-var typeRegex = regexp.MustCompile(`(?i)^([a-z]+)(?:\((.*)\))?(!)?:\s*(.*)$`)
-
-var typeTitles = map[string]string{
-	"feat":     "Features",
-	"fix":      "Bug Fixes",
-	"revert":   "Reverts",
-	"chore":    "Maintenance",
-	"docs":     "Documentation",
-	"style":    "Styles",
-	"refactor": "Refactor",
-	"perf":     "Performance Improvements",
-	"test":     "Tests",
-	"build":    "Build System",
-	"ci":       "Continuous Integration",
-}
-
-func renderGroupedCommits(b *strings.Builder, commits []string) {
-	groups := make(map[string][]string)
-	for _, c := range commits {
-		parts := strings.SplitN(c, " ", 2)
-		hash := parts[0]
-		matches := typeRegex.FindStringSubmatch(parts[1])
-		if len(matches) > 1 {
-			scp := ""
-			tpe := strings.ToLower(matches[1])
-			msg := matches[4]
-			if matches[2] != "" {
-				scp = fmt.Sprintf("%s: ", matches[2])
-			}
-			if matches[3] == "!" {
-				msg += " (BREAKING CHANGE)"
-			}
-
-			groups[tpe] = append(groups[tpe], fmt.Sprintf("%s%s (%s)", scp, msg, hash))
-		} else {
-			groups["misc"] = append(groups["misc"], fmt.Sprintf("%s (%s)", parts[1], hash))
-		}
-	}
-
-	// Preferred order for common types
-	order := []string{"feat", "fix", "revert", "perf", "refactor", "docs", "style", "test", "build", "ci", "chore"}
-	seen := make(map[string]bool)
-
-	for _, t := range order {
-		if items, ok := groups[t]; ok {
-			title := typeTitles[t]
-			b.WriteString("#### " + title + "\n\n")
-			for _, item := range items {
-				b.WriteString("- " + item + "\n")
-			}
-			b.WriteString("\n")
-			seen[t] = true
-		}
-	}
-
-	// Any other types discovered
-	var remaining []string
-	for t := range groups {
-		if !seen[t] && t != "misc" {
-			remaining = append(remaining, t)
-		}
-	}
-	sort.Strings(remaining)
-	for _, t := range remaining {
-		title := strings.ToUpper(t[:1]) + t[1:]
-		b.WriteString("#### " + title + "\n\n")
-		for _, item := range groups[t] {
-			b.WriteString("- " + item + "\n")
-		}
-		b.WriteString("\n")
-	}
-
-	// Misc last
-	if items, ok := groups["misc"]; ok {
-		b.WriteString("#### Misc\n\n")
-		for _, item := range items {
-			b.WriteString("- " + item + "\n")
-		}
-		b.WriteString("\n")
-	}
+	return formatter.FormatGroup(name, date, commits), nil
 }
 
 func filteredCommits(revRange string, tag string) ([]string, error) {
