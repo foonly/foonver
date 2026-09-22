@@ -1,9 +1,10 @@
 package commands
 
 import (
+	"fmt"
+
 	"github.com/foonly/foonver/internal/config"
 	"github.com/foonly/foonver/internal/git"
-	"github.com/foonly/foonver/internal/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -38,12 +39,16 @@ var rootCmd = &cobra.Command{
 	Use:          "foonver",
 	Short:        "Version Management Utility",
 	Long:         "foonver is a lightweight CLI utility for automated Semantic Versioning (SemVer) management.",
+	Version:      config.AppVersion,
 	SilenceUsage: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		_ = git.EnsureRepo()
 		config.Init()
 	},
-	RunE: version.RunVersion,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Printf("foonver version %s\n\n", config.AppVersion)
+		return cmd.Help()
+	},
 }
 
 func Execute() error {
