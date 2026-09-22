@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.18.0 (2026-09-21)
+## 1.0.0 (2026-09-22)
+
+#### Bug Fixes
+
+- cli: show version and usage on root command BREAKING CHANGE: Running foonver without subcommands now displays the version and usage help instead of defaulting to auto. Use foonver auto to calculate version bumps. (BREAKING CHANGE) (f34289f)
+
+## v0.18.0 (2026-09-21)
 
 #### Features
 
