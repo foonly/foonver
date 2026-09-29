@@ -214,6 +214,8 @@ If a `--version-file` is explicitly provided, automatic discovery is skipped. Th
 
 When using `version-sync`, the tool searches for the version string preceded by `version`, `v`, `ver`, or `stable tag` (case-insensitive). This is particularly useful for maintaining `README.md` files or WordPress `readme.txt` files.
 
+The active version file is always updated directly, so it should not be listed in `version-sync`. If it is, foonver ignores that entry and prints a warning.
+
 ## Development
 
 The project includes a `Makefile` for standard development tasks:

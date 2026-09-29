@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -893,6 +894,37 @@ func TestDetermineNextVersion_Prerelease(t *testing.T) {
 			}
 			if nextV.String() != tt.want {
 				t.Errorf("determineNextVersion() = %s, want %s", nextV.String(), tt.want)
+			}
+		})
+	}
+}
+
+func TestFilterSyncFiles(t *testing.T) {
+	oldRoot := config.Conf.Info.RootDir
+	config.Conf.Info.RootDir = "/repo"
+	defer func() { config.Conf.Info.RootDir = oldRoot }()
+
+	oldVerbosity := config.Conf.Verbosity
+	config.Conf.Verbosity = config.Quiet
+	defer func() { config.Conf.Verbosity = oldVerbosity }()
+
+	tests := []struct {
+		name        string
+		versionFile string
+		syncFiles   []string
+		want        []string
+	}{
+		{"no version file", "", []string{"README.md", "package.json"}, []string{"README.md", "package.json"}},
+		{"version file not in sync", "/repo/version.json", []string{"README.md"}, []string{"README.md"}},
+		{"version file in sync", "/repo/package.json", []string{"README.md", "package.json"}, []string{"README.md"}},
+		{"version file in sync with ./ prefix", "/repo/version.json", []string{"./version.json", "docs/index.md"}, []string{"docs/index.md"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := filterSyncFiles(tt.versionFile, tt.syncFiles)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("filterSyncFiles() = %v, want %v", got, tt.want)
 			}
 		})
 	}

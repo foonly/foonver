@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -206,6 +207,8 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 		Steps:             []PlanStep{},
 	}
 
+	syncFiles := filterSyncFiles(fileName, config.Conf.VersionSync)
+
 	if currentVersion.String() == nextVersion.String() {
 		return plan, nil
 	}
@@ -222,7 +225,7 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 	}
 
 	// 2. Version Sync
-	for _, syncFile := range config.Conf.VersionSync {
+	for _, syncFile := range syncFiles {
 		sFile := syncFile // capture for closure
 		matchInfo := ""
 		count, err := countSyncMatches(sFile, currentVersion.Original())
@@ -290,7 +293,7 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 			if fileName != "" {
 				files = append(files, fileName)
 			}
-			for _, syncFile := range config.Conf.VersionSync {
+			for _, syncFile := range syncFiles {
 				files = append(files, path.Join(config.Conf.Info.RootDir, syncFile))
 			}
 			if config.Conf.Changelog {
@@ -775,6 +778,28 @@ func checkChangelogMarkers(filePath string, startPattern string, endPattern stri
 
 	return fmt.Sprintf(" (%s)", strings.Join(parts, ", "))
 }
+
+// filterSyncFiles returns the version-sync entries with the active version file removed.
+// The version file is already updated directly, so syncing it as well would either fail
+// (the old version is gone) or double-process it. A warning is printed for each ignored entry.
+func filterSyncFiles(versionFile string, syncFiles []string) []string {
+	if versionFile == "" {
+		return syncFiles
+	}
+	versionPath := filepath.Clean(versionFile)
+	kept := make([]string, 0, len(syncFiles))
+	for _, syncFile := range syncFiles {
+		if filepath.Clean(path.Join(config.Conf.Info.RootDir, syncFile)) == versionPath {
+			if config.Conf.Verbosity != config.Quiet && !config.Conf.PrintVersion && !config.Conf.JSON {
+				fmt.Fprintf(os.Stderr, "Warning: %s is the active version file and is updated automatically. Ignoring it in version-sync; remove it from the version-sync list.\n", syncFile)
+			}
+			continue
+		}
+		kept = append(kept, syncFile)
+	}
+	return kept
+}
+
 func countSyncMatches(filename, oldVersion string) (int, error) {
 	filePath := path.Join(config.Conf.Info.RootDir, filename)
 	content, err := os.ReadFile(filePath)
