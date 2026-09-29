@@ -1,6 +1,12 @@
 # Changelog
 
-## 1.0.0 (2026-09-22)
+## 1.1.0 (2026-09-29)
+
+#### Features
+
+- version: check changelog markers during build plan generation (3c15e19)
+
+## v1.0.0 (2026-09-22)
 
 #### Bug Fixes
 
