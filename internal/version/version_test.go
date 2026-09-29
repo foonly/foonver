@@ -447,6 +447,67 @@ func TestCountSyncMatches(t *testing.T) {
 	})
 }
 
+func TestCheckChangelogMarkers(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "check-markers-test-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	readmePath := filepath.Join(tempDir, "readme.txt")
+	content := "=== Plugin ===\n== Changelog ==\n= 1.0.0 =\n* Init\n== Upgrade Notice ==\nUpgrade!\n"
+	if err := os.WriteFile(readmePath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("no start pattern", func(t *testing.T) {
+		got := checkChangelogMarkers(readmePath, "", "")
+		if got != "" {
+			t.Errorf("expected empty string when start pattern is empty, got %q", got)
+		}
+	})
+
+	t.Run("start pattern only - found", func(t *testing.T) {
+		got := checkChangelogMarkers(readmePath, "== Changelog ==", "")
+		expected := " (start marker found)"
+		if got != expected {
+			t.Errorf("expected %q, got %q", expected, got)
+		}
+	})
+
+	t.Run("start pattern only - not found", func(t *testing.T) {
+		got := checkChangelogMarkers(readmePath, "== Missing ==", "")
+		expected := " (start marker not found - will fail)"
+		if got != expected {
+			t.Errorf("expected %q, got %q", expected, got)
+		}
+	})
+
+	t.Run("both markers found", func(t *testing.T) {
+		got := checkChangelogMarkers(readmePath, "== Changelog ==", "== Upgrade Notice ==")
+		expected := " (start marker found, end marker found)"
+		if got != expected {
+			t.Errorf("expected %q, got %q", expected, got)
+		}
+	})
+
+	t.Run("start found but end not found", func(t *testing.T) {
+		got := checkChangelogMarkers(readmePath, "== Changelog ==", "== Missing End ==")
+		expected := " (start marker found, end marker not found - will fail)"
+		if got != expected {
+			t.Errorf("expected %q, got %q", expected, got)
+		}
+	})
+
+	t.Run("missing file", func(t *testing.T) {
+		got := checkChangelogMarkers(filepath.Join(tempDir, "nonexistent.txt"), "== Changelog ==", "")
+		expected := " (file not found)"
+		if got != expected {
+			t.Errorf("expected %q, got %q", expected, got)
+		}
+	})
+}
+
 func TestUpdateVersionFile(t *testing.T) {
 	tests := []struct {
 		name       string

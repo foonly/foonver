@@ -251,9 +251,11 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 
 	// 3. Changelog
 	if config.Conf.Changelog {
+		changelogPath := path.Join(config.Conf.Info.RootDir, config.Conf.ChangelogFile)
+		markerInfo := checkChangelogMarkers(changelogPath, config.Conf.ChangelogStart, config.Conf.ChangelogEnd)
 		plan.Steps = append(plan.Steps, PlanStep{
 			Type:        StepUpdateChangelog,
-			Description: fmt.Sprintf("Update changelog: %s", config.Conf.ChangelogFile),
+			Description: fmt.Sprintf("Update changelog: %s%s", config.Conf.ChangelogFile, markerInfo),
 			Action: func() error {
 				_, err := changelog.WriteChangelog(nextVersionStr)
 				return err
@@ -729,7 +731,50 @@ func updateVersionFile(filename, oldVersion, newVersion string, content []byte) 
 	return os.WriteFile(filename, newContent, 0644)
 }
 
-// countSyncMatches returns the number of version occurrences matching the sync pattern in the given file.
+// checkChangelogMarkers returns status info about changelog start/end patterns in the changelog file.
+func checkChangelogMarkers(filePath string, startPattern string, endPattern string) string {
+	if startPattern == "" {
+		return ""
+	}
+
+	contentBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return " (file not found)"
+		}
+		return fmt.Sprintf(" (read error: %v)", err)
+	}
+
+	content := string(contentBytes)
+	startIdx := strings.Index(content, startPattern)
+	startFound := startIdx != -1
+
+	var parts []string
+	if startFound {
+		parts = append(parts, "start marker found")
+	} else {
+		parts = append(parts, "start marker not found - will fail")
+	}
+
+	if endPattern != "" {
+		if startFound {
+			rest := content[startIdx+len(startPattern):]
+			if strings.Contains(rest, endPattern) {
+				parts = append(parts, "end marker found")
+			} else {
+				parts = append(parts, "end marker not found - will fail")
+			}
+		} else {
+			if strings.Contains(content, endPattern) {
+				parts = append(parts, "end marker found")
+			} else {
+				parts = append(parts, "end marker not found - will fail")
+			}
+		}
+	}
+
+	return fmt.Sprintf(" (%s)", strings.Join(parts, ", "))
+}
 func countSyncMatches(filename, oldVersion string) (int, error) {
 	filePath := path.Join(config.Conf.Info.RootDir, filename)
 	content, err := os.ReadFile(filePath)
