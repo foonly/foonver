@@ -331,3 +331,182 @@ func TestGetDirtyFiles_Rename(t *testing.T) {
 		t.Errorf("expected only %q, got %v", newName, dirty)
 	}
 }
+
+func TestFormatTag(t *testing.T) {
+	oldPrefix := config.Conf.Prefix
+	defer func() { config.Conf.Prefix = oldPrefix }()
+
+	config.Conf.Prefix = "v"
+	if got := FormatTag("1.2.3"); got != "v1.2.3" {
+		t.Errorf("expected v1.2.3, got %q", got)
+	}
+	if got := FormatTag("v1.2.3"); got != "v1.2.3" {
+		t.Errorf("expected v1.2.3, got %q", got)
+	}
+
+	config.Conf.Prefix = "rel-"
+	if got := FormatTag("1.2.3"); got != "rel-1.2.3" {
+		t.Errorf("expected rel-1.2.3, got %q", got)
+	}
+	if got := FormatTag("v1.2.3"); got != "v1.2.3" {
+		t.Errorf("expected v1.2.3 (preserved), got %q", got)
+	}
+
+	config.Conf.Prefix = ""
+	if got := FormatTag("1.2.3"); got != "1.2.3" {
+		t.Errorf("expected 1.2.3, got %q", got)
+	}
+}
+
+func TestPush(t *testing.T) {
+	remoteDir, err := os.MkdirTemp("", "foonver-git-remote-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(remoteDir)
+
+	// Initialize bare remote repo
+	cmd := exec.Command("git", "init", "--bare")
+	cmd.Dir = remoteDir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to init bare repo: %v\n%s", err, out)
+	}
+
+	dir := setupTestRepo(t)
+	defer os.RemoveAll(dir)
+
+	oldRoot := config.Conf.Info.RootDir
+	oldCwd, _ := os.Getwd()
+	oldRemote := config.Conf.Remote
+	config.Conf.Info.RootDir = dir
+	config.Conf.Remote = "origin"
+	os.Chdir(dir)
+	defer func() {
+		config.Conf.Info.RootDir = oldRoot
+		config.Conf.Remote = oldRemote
+		os.Chdir(oldCwd)
+	}()
+
+	// Add remote and push initial commit
+	if _, err := runGit("remote", "add", "origin", remoteDir); err != nil {
+		t.Fatalf("failed to add remote: %v", err)
+	}
+	if _, err := runGit("push", "-u", "origin", "HEAD"); err != nil {
+		t.Fatalf("failed to push initial commit: %v", err)
+	}
+
+	// Create a new commit and tag
+	version := "v1.0.0"
+	testFile := "version.txt"
+	if err := os.WriteFile(filepath.Join(dir, testFile), []byte("1.0.0"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := CommitAndTag([]string{testFile}, version); err != nil {
+		t.Fatalf("CommitAndTag failed: %v", err)
+	}
+
+	// Also create an unrelated local tag that should NOT be pushed
+	if _, err := runGit("tag", "unrelated-tag"); err != nil {
+		t.Fatalf("failed to create unrelated tag: %v", err)
+	}
+
+	// Push just the version tag and commit
+	if err := Push(version); err != nil {
+		t.Fatalf("Push failed: %v", err)
+	}
+
+	// Verify remote has the tag
+	out, err := exec.Command("git", "-C", remoteDir, "tag", "-l").CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to list remote tags: %v", err)
+	}
+	tags := strings.Fields(string(out))
+	if len(tags) != 1 || tags[0] != version {
+		t.Errorf("expected remote to have only %s, got: %v", version, tags)
+	}
+
+	// Verify remote has the new commit
+	out, err = exec.Command("git", "-C", remoteDir, "log", "-1", "--pretty=%s").CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to get remote head commit: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != version {
+		t.Errorf("expected remote head commit %q, got %q", version, strings.TrimSpace(string(out)))
+	}
+}
+
+func TestPush_AtomicFailure(t *testing.T) {
+	remoteDir, err := os.MkdirTemp("", "foonver-git-remote-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(remoteDir)
+
+	// Initialize bare remote repo
+	cmd := exec.Command("git", "init", "--bare")
+	cmd.Dir = remoteDir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to init bare repo: %v\n%s", err, out)
+	}
+
+	dir := setupTestRepo(t)
+	defer os.RemoveAll(dir)
+
+	oldRoot := config.Conf.Info.RootDir
+	oldCwd, _ := os.Getwd()
+	oldRemote := config.Conf.Remote
+	config.Conf.Info.RootDir = dir
+	config.Conf.Remote = "origin"
+	os.Chdir(dir)
+	defer func() {
+		config.Conf.Info.RootDir = oldRoot
+		config.Conf.Remote = oldRemote
+		os.Chdir(oldCwd)
+	}()
+
+	// Add remote and push initial commit
+	if _, err := runGit("remote", "add", "origin", remoteDir); err != nil {
+		t.Fatalf("failed to add remote: %v", err)
+	}
+	if _, err := runGit("push", "-u", "origin", "HEAD"); err != nil {
+		t.Fatalf("failed to push initial commit: %v", err)
+	}
+
+	// Push a tag "v1.0.0" on remote pointing to initial commit
+	if _, err := runGit("tag", "v1.0.0"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runGit("push", "origin", "refs/tags/v1.0.0"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Now make a new commit locally and move the tag
+	testFile := "version.txt"
+	if err := os.WriteFile(filepath.Join(dir, testFile), []byte("1.0.0"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runGit("add", testFile); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runGit("commit", "-m", "new commit"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runGit("tag", "-f", "v1.0.0"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Atomic push should fail because tag already exists on remote and is conflicting
+	err = Push("v1.0.0")
+	if err == nil {
+		t.Fatal("expected Push to fail due to conflicting tag, but it succeeded")
+	}
+
+	// Verify remote branch was NOT updated to the new commit (atomic rollback)
+	out, err := exec.Command("git", "-C", remoteDir, "log", "-1", "--pretty=%s").CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to get remote head commit: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "initial commit" {
+		t.Errorf("expected remote commit to remain 'initial commit', got %q", strings.TrimSpace(string(out)))
+	}
+}

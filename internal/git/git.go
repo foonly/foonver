@@ -150,6 +150,17 @@ func RunPreflightChecks() error {
 	return nil
 }
 
+// FormatTag returns the tag name for a given version string, applying the
+// configured prefix if the version doesn't already have one or start with a non-digit.
+func FormatTag(version string) string {
+	versionString := version
+	alreadyPrefixed := version == "" || version[0] < '0' || version[0] > '9'
+	if config.Conf.Prefix != "" && !strings.HasPrefix(version, config.Conf.Prefix) && !alreadyPrefixed {
+		versionString = fmt.Sprintf("%s%s", config.Conf.Prefix, version)
+	}
+	return versionString
+}
+
 // CommitAndTag stages the version files, commits them with the version as the message, and creates a Git tag.
 func CommitAndTag(filenames []string, version string) error {
 	// Add files
@@ -163,11 +174,7 @@ func CommitAndTag(filenames []string, version string) error {
 	// already starts with a non-digit (e.g. a literal "v" preserved from the
 	// version file) is assumed to already carry its own prefix, so we don't
 	// stack the configured prefix on top of it.
-	versionString := version
-	alreadyPrefixed := version == "" || version[0] < '0' || version[0] > '9'
-	if config.Conf.Prefix != "" && !strings.HasPrefix(version, config.Conf.Prefix) && !alreadyPrefixed {
-		versionString = fmt.Sprintf("%s%s", config.Conf.Prefix, version)
-	}
+	versionString := FormatTag(version)
 
 	// Determine commit message
 	commitMsg := config.Conf.CommitMessage
@@ -207,20 +214,50 @@ func CommitAndTag(filenames []string, version string) error {
 	return nil
 }
 
-// PushTags pushes local commits and tags to the remote repository.
-func PushTags() error {
+// Push pushes local commits and the specified tag to the remote repository atomically.
+// It uses --atomic to ensure that either both HEAD and the tag are pushed, or neither.
+// If the remote server does not support atomic push, it falls back to a non-atomic push.
+func Push(tag string) error {
 	remote := config.Conf.Remote
 	if remote == "" {
 		remote = "origin"
 	}
 
-	if _, err := runGit("push", remote, "HEAD"); err != nil {
-		return err
+	args := []string{"push", "--atomic", remote, "HEAD"}
+	if tag != "" {
+		tagRef := tag
+		if !strings.HasPrefix(tagRef, "refs/tags/") {
+			tagRef = "refs/tags/" + tagRef
+		}
+		args = append(args, tagRef)
 	}
-	if _, err := runGit("push", remote, "--tags"); err != nil {
+
+	if _, err := runGit(args...); err != nil {
+		if strings.Contains(err.Error(), "does not support --atomic push") {
+			fallbackArgs := []string{"push", remote, "HEAD"}
+			if tag != "" {
+				tagRef := tag
+				if !strings.HasPrefix(tagRef, "refs/tags/") {
+					tagRef = "refs/tags/" + tagRef
+				}
+				fallbackArgs = append(fallbackArgs, tagRef)
+			}
+			_, err = runGit(fallbackArgs...)
+			return err
+		}
 		return err
 	}
 	return nil
+}
+
+// PushTags pushes local commits and tags to the remote repository.
+// Deprecated: Use Push instead.
+func PushTags(tag ...string) error {
+	t := ""
+	if len(tag) > 0 {
+		t = tag[0]
+	}
+	return Push(t)
 }
 
 type Tag struct {

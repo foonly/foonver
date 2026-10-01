@@ -307,11 +307,12 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 	// 5. Push
 	if config.Conf.Push {
 		if config.Conf.Info.HasRemote {
+			tagName := git.FormatTag(nextVersionStr)
 			plan.Steps = append(plan.Steps, PlanStep{
 				Type:        StepGitPush,
-				Description: "Git push commits and tags",
+				Description: fmt.Sprintf("Git push commit and tag: %s", tagName),
 				Action: func() error {
-					return git.PushTags()
+					return git.Push(tagName)
 				},
 			})
 		}
