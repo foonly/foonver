@@ -1,6 +1,12 @@
 # Changelog
 
-### 1.1.1 (2026-09-29)
+## 1.2.0 (2026-10-01)
+
+#### Features
+
+- git: add atomic push support for specific tags (92355d8)
+
+### v1.1.1 (2026-09-29)
 
 #### Bug Fixes
 
