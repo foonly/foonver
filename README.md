@@ -1,6 +1,6 @@
 # Foonver
 
-Version 1.2.0
+Version 1.3.0
 
 `foonver` is a lightweight CLI utility for automated Semantic Versioning (SemVer) management. Inspired by the functionality of `npm version`, it simplifies the release workflow by automating version bumping, file updates, and Git lifecycle operations.
 
@@ -141,7 +141,7 @@ Customize the version bump commit message or append a suffix:
 foonver patch --commit-suffix "[skip ci]"
 
 # Use a completely custom message
-foonver minor -m "Release: new features for v1.2.0"
+foonver minor -m "Release: new features for v1.3.0"
 
 # Use a non-standard version file
 foonver patch --version-file "config/project.json"
@@ -164,7 +164,7 @@ Foonver looks for a `.foonver.toml`, `.foonver.yaml`, or `.foonver.json` file (f
 # Automatically push commits and tags to remote
 push = false
 
-# Prefix for git tags (e.g., v1.2.0)
+# Prefix for git tags (e.g., v1.3.0)
 prefix = "v"
 
 # Git remote to push to (defaults to origin)

@@ -7,7 +7,7 @@
     { self, nixpkgs }:
     let
       # Kept in sync by foonver's version_sync on release.
-      version = "1.2.0";
+      version = "1.3.0";
       systems = [
         "x86_64-linux"
         "aarch64-linux"

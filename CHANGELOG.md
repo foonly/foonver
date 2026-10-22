@@ -1,6 +1,12 @@
 # Changelog
 
-## 1.2.0 (2026-10-01)
+## 1.3.0 (2026-10-22)
+
+#### Features
+
+- nix: add flake for installing on NixOS (1ba2a3c)
+
+## v1.2.0 (2026-10-01)
 
 #### Features
 
