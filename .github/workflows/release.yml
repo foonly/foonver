@@ -29,6 +29,13 @@ jobs:
         # This ensures the code compiles before we commit any version bumps
         run: make build
 
+      - name: Setup Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Verify Nix Build
+        # Fails if vendorHash in flake.nix is stale after a go.mod change
+        run: nix build -L
+
       - name: Run foonver
         id: foonver
         uses: ./
@@ -38,7 +45,7 @@ jobs:
           changelog: "true"
           push: "true"
           prerelease: ${{ github.ref != 'refs/heads/main' }}
-          version_sync: "README.md"
+          version_sync: "README.md,flake.nix"
           remote: ""
 
       - name: Build Release Binary

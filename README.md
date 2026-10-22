@@ -35,6 +35,18 @@ cd foonver
 make install
 ```
 
+### Nix
+
+```bash
+# Run without installing
+nix run github:foonly/foonver
+
+# Install into your profile
+nix profile install github:foonly/foonver
+```
+
+On NixOS, add the flake as an input and put `foonver.packages.${pkgs.system}.default` in `environment.systemPackages`, or apply `foonver.overlays.default` to get `pkgs.foonver`.
+
 ## Usage
 
 Foonver requires a subcommand to perform a version bump.
