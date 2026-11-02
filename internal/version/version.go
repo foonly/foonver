@@ -32,6 +32,7 @@ const (
 	StepGitPush           StepType = "GitPush"
 	StepWriteReleaseNotes StepType = "WriteReleaseNotes"
 	StepSyncVersion       StepType = "SyncVersion"
+	StepUpdateLockFile    StepType = "UpdateLockFile"
 )
 
 type PlanStep struct {
@@ -62,6 +63,38 @@ var versionFiles = []string{
 	"version.md",
 	"package.json",
 	"composer.json",
+	"Cargo.toml",
+	"pyproject.toml",
+	"deno.json",
+	"jsr.json",
+	"pubspec.yaml",
+	"gleam.toml",
+	"Project.toml",
+	"Chart.yaml",
+}
+
+// tomlVersionTables lists, in priority order, the TOML tables that hold the project version
+// for well-known manifest files. The empty string is the root table. Files not listed here
+// fall back to the first `version = "..."` assignment found anywhere in the file.
+var tomlVersionTables = map[string][]string{
+	"Cargo.toml":     {"package", "workspace.package"},
+	"pyproject.toml": {"project", "tool.poetry"},
+	"gleam.toml":     {""},
+	"Project.toml":   {""},
+}
+
+// replaceYamlVersion replaces the value of the top-level `version:` key, quoted or not.
+func replaceYamlVersion(content []byte, oldVersion, newVersion string) []byte {
+	re := regexp.MustCompile(`(?m)^(version:[ \t]*["']?)` + regexp.QuoteMeta(oldVersion) + `(["']?[ \t]*(?:#.*)?\r?)$`)
+	loc := re.FindSubmatchIndex(content)
+	if loc == nil {
+		return content
+	}
+	var out bytes.Buffer
+	out.Write(content[:loc[3]])
+	out.WriteString(newVersion)
+	out.Write(content[loc[4]:])
+	return out.Bytes()
 }
 
 func RunVersion(cmd *cobra.Command, args []string) error {
@@ -224,6 +257,26 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 		})
 	}
 
+	// 1b. Lock files that record the project's own version (Cargo.lock, package-lock.json, ...)
+	lockUpdates, lockWarnings := planLockFileUpdates(fileName, fileContent, currentVersion.Original(), nextVersionStr)
+	if config.Conf.Verbosity != config.Quiet && !config.Conf.PrintVersion && !config.Conf.JSON {
+		for _, w := range lockWarnings {
+			fmt.Fprintf(os.Stderr, "Warning: %s\n", w)
+		}
+	}
+	for _, lockUpdate := range lockUpdates {
+		u := lockUpdate // capture for closure
+		entries := "1 entry"
+		if u.Entries != 1 {
+			entries = fmt.Sprintf("%d entries", u.Entries)
+		}
+		plan.Steps = append(plan.Steps, PlanStep{
+			Type:        StepUpdateLockFile,
+			Description: fmt.Sprintf("Update %s: %s -> %s (%s)", u.Path, currentVersion.Original(), nextVersionStr, entries),
+			Action:      u.apply,
+		})
+	}
+
 	// 2. Version Sync
 	for _, syncFile := range syncFiles {
 		sFile := syncFile // capture for closure
@@ -292,6 +345,9 @@ func BuildPlan(cmd *cobra.Command, args []string) (*ExecutionPlan, error) {
 			files := []string{}
 			if fileName != "" {
 				files = append(files, fileName)
+			}
+			for _, u := range lockUpdates {
+				files = append(files, u.Path)
 			}
 			for _, syncFile := range syncFiles {
 				files = append(files, path.Join(config.Conf.Info.RootDir, syncFile))
@@ -383,7 +439,7 @@ func discoverVersion() (string, *semver.Version, []byte, error) {
 }
 
 // ExtractVersion extracts a version string from the given file content based on the filename's extension.
-// It supports .json, .toml, .txt, and .md files.
+// It supports .json, .toml, .yaml/.yml, .txt, and .md files.
 func extractVersion(filename string, content []byte) (string, error) {
 	switch {
 	case strings.HasSuffix(filename, ".json"):
@@ -407,12 +463,14 @@ func extractVersion(filename string, content []byte) (string, error) {
 		return "", fmt.Errorf("no 'version' string field found")
 
 	case strings.HasSuffix(filename, ".toml"):
-		re := regexp.MustCompile(`(?m)^version\s*=\s*['"]([^'"]+)['"]`)
-		matches := re.FindSubmatch(content)
-		if len(matches) > 1 {
-			return string(matches[1]), nil
+		v, _, _, err := findTomlVersion(filename, content)
+		if err != nil {
+			return "", err
 		}
-		return "", fmt.Errorf("no version string found")
+		if v == "" {
+			return "", fmt.Errorf("empty version string")
+		}
+		return v, nil
 
 	case strings.HasSuffix(filename, ".txt"):
 		return strings.TrimSpace(string(content)), nil
@@ -710,19 +768,27 @@ func updateVersionFile(filename, oldVersion, newVersion string, content []byte) 
 	var newContent []byte
 
 	switch {
-	case strings.HasSuffix(filename, ".json"), strings.HasSuffix(filename, ".toml"), strings.HasSuffix(filename, ".yaml"), strings.HasSuffix(filename, ".yml"):
-		// Simple string replacement for JSON, TOML and YAML to preserve formatting.
+	case strings.HasSuffix(filename, ".json"):
+		// Simple string replacement for JSON to preserve formatting.
 		// A more robust approach would use an AST, but this works for basic cases.
 		oldStr := fmt.Sprintf(`"%s"`, oldVersion)
 		newStr := fmt.Sprintf(`"%s"`, newVersion)
 		newContent = bytes.Replace(content, []byte(oldStr), []byte(newStr), 1)
 
-		// TOML/YAML might use single quotes
-		if bytes.Equal(content, newContent) && (strings.HasSuffix(filename, ".toml") || strings.HasSuffix(filename, ".yaml") || strings.HasSuffix(filename, ".yml")) {
-			oldStr := fmt.Sprintf(`'%s'`, oldVersion)
-			newStr := fmt.Sprintf(`'%s'`, newVersion)
-			newContent = bytes.Replace(content, []byte(oldStr), []byte(newStr), 1)
+	case strings.HasSuffix(filename, ".toml"):
+		// Replace exactly the value discovery read, so versions in other tables
+		// (e.g. dependencies) are never touched.
+		newContent = content
+		if v, start, end, err := findTomlVersion(filename, content); err == nil && v == oldVersion {
+			var out bytes.Buffer
+			out.Write(content[:start])
+			out.WriteString(newVersion)
+			out.Write(content[end:])
+			newContent = out.Bytes()
 		}
+
+	case strings.HasSuffix(filename, ".yaml"), strings.HasSuffix(filename, ".yml"):
+		newContent = replaceYamlVersion(content, oldVersion, newVersion)
 
 	case strings.HasSuffix(filename, ".txt"), strings.HasSuffix(filename, ".md"):
 		newContent = bytes.Replace(content, []byte(oldVersion), []byte(newVersion), 1)
