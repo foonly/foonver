@@ -8,7 +8,7 @@ Version 1.3.0
 
 - **Plan-First Workflow**: Preview exactly what will happen before any files are changed.
 - **Automated Versioning**: Intelligently determines the next version by analyzing Git commit history since the last tag.
-- **Multi-format Support**: Discovers and updates version strings in `version.json`, `version.toml`, `version.yaml`, `version.txt`, `version.md`, `package.json`, and `composer.json`.
+- **Multi-format Support**: Discovers and updates version strings in `version.json`, `version.toml`, `version.yaml`, `version.txt`, `version.md`, and common project manifests: `package.json`, `composer.json`, `Cargo.toml`, `pyproject.toml`, `deno.json`, `jsr.json`, `pubspec.yaml`, `gleam.toml`, Julia's `Project.toml`, and Helm's `Chart.yaml`.
 - **Custom Version Files**: Explicitly specify any JSON, TOML, or YAML file to use as the source of truth for the project version.
 - **Version Synchronization**: Update version mentions in arbitrary files (like READMEs or documentation) automatically.
 - **Git Integration**:
@@ -216,11 +216,33 @@ The tool scans the project root for files in this order:
 
 1. `version.json`
 2. `version.toml`
-3. `version.yaml`
+3. `version.yaml` / `version.yml`
 4. `version.txt`
 5. `version.md`
 6. `package.json`
 7. `composer.json`
+8. `Cargo.toml` (`[package]`, then `[workspace.package]`)
+9. `pyproject.toml` (`[project]`, then `[tool.poetry]`)
+10. `deno.json`
+11. `jsr.json`
+12. `pubspec.yaml`
+13. `gleam.toml`
+14. `Project.toml` (Julia)
+15. `Chart.yaml` (Helm)
+
+The first file that exists and contains a version is used. A file without one is skipped, for example a `deno.json` with no `version` field, a Cargo crate using `version.workspace = true`, or a `pyproject.toml` with `dynamic = ["version"]`. For `Cargo.toml` and `pyproject.toml`, only the tables listed above are read and updated, so dependency versions are never touched.
+
+### Lock Files
+
+When the version file has a lock file next to it that records the project's own version, foonver updates that lock file too and includes it in the version-bump commit:
+
+| Version file     | Lock files                                  | Entries updated                                                                                                   |
+| ---------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `package.json`   | `package-lock.json`, `npm-shrinkwrap.json`  | Top-level `version` and `packages[""].version`                                                                    |
+| `Cargo.toml`     | `Cargo.lock`                                | The crate's own `[[package]]` entry; for `[workspace.package]`, every local (source-less) entry on the old version |
+| `pyproject.toml` | `uv.lock`                                   | The `[[package]]` entry matching the project name                                                                 |
+
+Only the version values are changed; the rest of the file is left byte-for-byte intact. If a lock file exists but has no entry with the current version (i.e. it is already out of date), foonver leaves it alone and prints a warning. Other lock files (`yarn.lock`, `pnpm-lock.yaml`, `poetry.lock`, `composer.lock`, ...) don't store the project's own version and need no update.
 
 If a `--version-file` is explicitly provided, automatic discovery is skipped. The file must be a valid `.json`, `.toml`, or `.yaml` file containing a `version` field in the root object, or a `.txt` or `.md` file containing the version string.
 

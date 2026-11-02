@@ -929,3 +929,146 @@ func TestFilterSyncFiles(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractVersionManifests(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		content  string
+		want     string
+		wantErr  bool
+	}{
+		{
+			name:     "Cargo.toml package",
+			filename: "Cargo.toml",
+			content:  "[package]\nname = \"demo\"\nversion = \"0.4.1\"\n\n[dependencies.serde]\nversion = \"1.0.0\"\n",
+			want:     "0.4.1",
+		},
+		{
+			name:     "Cargo.toml dependency table before package",
+			filename: "Cargo.toml",
+			content:  "[dependencies.serde]\nversion = \"1.0.0\"\n\n[package]\nname = \"demo\"\nversion = \"0.4.1\"\n",
+			want:     "0.4.1",
+		},
+		{
+			name:     "Cargo.toml workspace package",
+			filename: "Cargo.toml",
+			content:  "[workspace]\nmembers = [\"a\"]\n\n[workspace.dependencies]\nfoo = { version = \"9.9.9\" }\n\n[workspace.package]\nversion = \"2.1.0\"\n",
+			want:     "2.1.0",
+		},
+		{
+			name:     "Cargo.toml inherited workspace version",
+			filename: "Cargo.toml",
+			content:  "[package]\nname = \"member\"\nversion.workspace = true\n",
+			wantErr:  true,
+		},
+		{
+			name:     "pyproject.toml PEP 621",
+			filename: "pyproject.toml",
+			content:  "[build-system]\nrequires = [\"hatchling\"]\n\n[project]\nname = \"demo\"\nversion = '3.0.0rc1'\n",
+			want:     "3.0.0rc1",
+		},
+		{
+			name:     "pyproject.toml poetry",
+			filename: "pyproject.toml",
+			content:  "[tool.poetry]\nname = \"demo\"\nversion = \"1.5.0\"\n",
+			want:     "1.5.0",
+		},
+		{
+			name:     "pyproject.toml dynamic version",
+			filename: "pyproject.toml",
+			content:  "[project]\nname = \"demo\"\ndynamic = [\"version\"]\n\n[tool.other]\nversion = \"1.0.0\"\n",
+			wantErr:  true,
+		},
+		{
+			name:     "gleam.toml root",
+			filename: "gleam.toml",
+			content:  "name = \"demo\"\nversion = \"1.0.2\"\n\n[dependencies]\ngleam_stdlib = \">= 0.34.0\"\n",
+			want:     "1.0.2",
+		},
+		{
+			name:     "pubspec.yaml with build number",
+			filename: "pubspec.yaml",
+			content:  "name: demo\nversion: 1.2.3+4\n",
+			want:     "1.2.3+4",
+		},
+		{
+			name:     "deno.json",
+			filename: "deno.json",
+			content:  `{"name": "@scope/demo", "version": "0.2.0", "exports": "./mod.ts"}`,
+			want:     "0.2.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := extractVersion(tt.filename, []byte(tt.content))
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("extractVersion() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("extractVersion() got = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUpdateVersionFileManifests(t *testing.T) {
+	tests := []struct {
+		name       string
+		filename   string
+		content    string
+		oldVersion string
+		newVersion string
+		want       string
+	}{
+		{
+			name:       "Cargo.toml leaves matching dependency alone",
+			filename:   "Cargo.toml",
+			content:    "[dependencies.foo]\nversion = \"1.2.3\"\n\n[package]\nname = \"demo\"\nversion = \"1.2.3\" # bump me\n",
+			oldVersion: "1.2.3",
+			newVersion: "1.3.0",
+			want:       "[dependencies.foo]\nversion = \"1.2.3\"\n\n[package]\nname = \"demo\"\nversion = \"1.3.0\" # bump me\n",
+		},
+		{
+			name:       "pyproject.toml single quotes",
+			filename:   "pyproject.toml",
+			content:    "[project]\nversion = '0.1.0'\n",
+			oldVersion: "0.1.0",
+			newVersion: "0.2.0",
+			want:       "[project]\nversion = '0.2.0'\n",
+		},
+		{
+			name:       "Chart.yaml unquoted, appVersion untouched",
+			filename:   "Chart.yaml",
+			content:    "apiVersion: v2\nname: demo\nappVersion: \"1.2.3\"\nversion: 1.2.3\n",
+			oldVersion: "1.2.3",
+			newVersion: "1.2.4",
+			want:       "apiVersion: v2\nname: demo\nappVersion: \"1.2.3\"\nversion: 1.2.4\n",
+		},
+		{
+			name:       "pubspec.yaml with CRLF",
+			filename:   "pubspec.yaml",
+			content:    "name: demo\r\nversion: 1.0.0\r\n",
+			oldVersion: "1.0.0",
+			newVersion: "1.1.0",
+			want:       "name: demo\r\nversion: 1.1.0\r\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file := filepath.Join(t.TempDir(), tt.filename)
+			if err := updateVersionFile(file, tt.oldVersion, tt.newVersion, []byte(tt.content)); err != nil {
+				t.Fatalf("updateVersionFile() error = %v", err)
+			}
+			got, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("updateVersionFile() got = %q, want %q", string(got), tt.want)
+			}
+		})
+	}
+}
