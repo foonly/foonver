@@ -1,6 +1,12 @@
 # Changelog
 
-## 1.3.0 (2026-10-22)
+## 1.4.0 (2026-11-02)
+
+#### Features
+
+- version: support Cargo.toml and other manifests, update lock files (db6ba1a)
+
+## v1.3.0 (2026-10-22)
 
 #### Features
 
