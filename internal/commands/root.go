@@ -33,6 +33,7 @@ var (
 	flagChangelogFormat    string
 	flagChangelogStart     string
 	flagChangelogEnd       string
+	flagChangelogForce     bool
 )
 
 var rootCmd = &cobra.Command{
@@ -79,6 +80,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&flagChangelogFormat, "changelog-format", "", "format for changelog (markdown, wordpress)")
 	rootCmd.PersistentFlags().StringVar(&flagChangelogStart, "changelog-start", "", "start pattern marker in changelog file")
 	rootCmd.PersistentFlags().StringVar(&flagChangelogEnd, "changelog-end", "", "end pattern marker in changelog file")
+	rootCmd.PersistentFlags().BoolVar(&flagChangelogForce, "changelog-force", false, "regenerate every changelog section instead of keeping existing ones")
 
 	rootCmd.MarkFlagsMutuallyExclusive("quiet", "normal", "verbose", "debug")
 	rootCmd.MarkFlagsMutuallyExclusive("push", "no-push")
@@ -106,6 +108,7 @@ func init() {
 	viper.BindPFlag("changelog-format", rootCmd.PersistentFlags().Lookup("changelog-format"))
 	viper.BindPFlag("changelog-start", rootCmd.PersistentFlags().Lookup("changelog-start"))
 	viper.BindPFlag("changelog-end", rootCmd.PersistentFlags().Lookup("changelog-end"))
+	viper.BindPFlag("changelog-force", rootCmd.PersistentFlags().Lookup("changelog-force"))
 
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
