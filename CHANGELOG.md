@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0 (2026-11-19)
+
+#### Features
+
+- changelog: keep manual edits when regenerating the changelog (f8177d6)
+- changelog: treat unknown commit prefixes as scopes (83868f9)
+
 ## 1.4.0 (2026-11-02)
 
 #### Features
