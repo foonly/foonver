@@ -2,9 +2,44 @@ package changelog
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/foonly/foonver/internal/config"
 )
+
+// scopeRegex matches "scope: message" style commits (e.g. "gui: move button")
+// whose prefix is not a recognised conventional commit type.
+var scopeRegex = regexp.MustCompile(`^([A-Za-z0-9][\w./-]*)(!)?:\s+(.+)$`)
+
+// isKnownType reports whether t is a conventional commit type that gets its
+// own changelog section: either a built-in type or one listed in the
+// changelog-types config option.
+func isKnownType(t string) bool {
+	if _, ok := typeTitles[t]; ok {
+		return true
+	}
+	for _, ct := range config.Conf.ChangelogTypes {
+		if strings.EqualFold(strings.TrimSpace(ct), t) {
+			return true
+		}
+	}
+	return false
+}
+
+// sortMisc orders uncategorised commits so that scoped entries come first,
+// clustered alphabetically by scope, followed by unscoped entries. Commit
+// order is preserved within each scope.
+func sortMisc(items []CommitInfo) {
+	sort.SliceStable(items, func(i, j int) bool {
+		si, sj := strings.ToLower(items[i].Scope), strings.ToLower(items[j].Scope)
+		if (si == "") != (sj == "") {
+			return si != ""
+		}
+		return si < sj
+	})
+}
 
 // CommitInfo represents structured information parsed from a conventional commit message.
 type CommitInfo struct {
@@ -47,13 +82,25 @@ func parseCommit(c string) CommitInfo {
 	}
 
 	matches := typeRegex.FindStringSubmatch(parts[1])
-	if len(matches) > 1 {
+	if len(matches) > 1 && isKnownType(strings.ToLower(matches[1])) {
 		return CommitInfo{
 			Hash:     hash,
 			Type:     strings.ToLower(matches[1]),
 			Scope:    matches[2],
 			Breaking: matches[3] == "!",
 			Message:  matches[4],
+			Raw:      parts[1],
+		}
+	}
+
+	// Not a known type: treat "something: message" as a scoped misc commit.
+	if m := scopeRegex.FindStringSubmatch(parts[1]); m != nil {
+		return CommitInfo{
+			Hash:     hash,
+			Type:     "misc",
+			Scope:    m[1],
+			Breaking: m[2] == "!",
+			Message:  m[3],
 			Raw:      parts[1],
 		}
 	}
@@ -94,22 +141,31 @@ func (f *MarkdownFormatter) FormatGroup(name string, date string, commits []stri
 }
 
 func renderGroupedCommitsMarkdown(b *strings.Builder, commits []string) {
+	format := func(info CommitInfo) string {
+		scp := ""
+		msg := info.Message
+		if info.Scope != "" {
+			scp = fmt.Sprintf("%s: ", info.Scope)
+		}
+		if info.Breaking {
+			msg += " (BREAKING CHANGE)"
+		}
+		return fmt.Sprintf("%s%s (%s)", scp, msg, info.Hash)
+	}
+
 	groups := make(map[string][]string)
+	var misc []CommitInfo
 	for _, c := range commits {
 		info := parseCommit(c)
-		if info.Type != "misc" {
-			scp := ""
-			msg := info.Message
-			if info.Scope != "" {
-				scp = fmt.Sprintf("%s: ", info.Scope)
-			}
-			if info.Breaking {
-				msg += " (BREAKING CHANGE)"
-			}
-			groups[info.Type] = append(groups[info.Type], fmt.Sprintf("%s%s (%s)", scp, msg, info.Hash))
-		} else {
-			groups["misc"] = append(groups["misc"], fmt.Sprintf("%s (%s)", info.Message, info.Hash))
+		if info.Type == "misc" {
+			misc = append(misc, info)
+			continue
 		}
+		groups[info.Type] = append(groups[info.Type], format(info))
+	}
+	sortMisc(misc)
+	for _, info := range misc {
+		groups["misc"] = append(groups["misc"], format(info))
 	}
 
 	order := []string{"feat", "fix", "revert", "perf", "refactor", "docs", "style", "test", "build", "ci", "chore"}
@@ -198,25 +254,37 @@ func (f *WordPressFormatter) FormatGroup(name string, date string, commits []str
 
 func renderGroupedCommitsWordPress(b *strings.Builder, commits []string) {
 	groups := make(map[string][]string)
+	var misc []CommitInfo
 	for _, c := range commits {
 		info := parseCommit(c)
-		if info.Type != "misc" {
-			prefix, ok := wpTypeTitles[info.Type]
-			if !ok {
-				prefix = strings.ToUpper(info.Type[:1]) + info.Type[1:]
-			}
-			scp := ""
-			msg := info.Message
-			if info.Scope != "" {
-				scp = fmt.Sprintf("%s - ", info.Scope)
-			}
-			if info.Breaking {
-				msg += " (BREAKING CHANGE)"
-			}
-			groups[info.Type] = append(groups[info.Type], fmt.Sprintf("* %s: %s%s", prefix, scp, msg))
-		} else {
-			groups["misc"] = append(groups["misc"], fmt.Sprintf("* %s", info.Message))
+		if info.Type == "misc" {
+			misc = append(misc, info)
+			continue
 		}
+		prefix, ok := wpTypeTitles[info.Type]
+		if !ok {
+			prefix = strings.ToUpper(info.Type[:1]) + info.Type[1:]
+		}
+		scp := ""
+		msg := info.Message
+		if info.Scope != "" {
+			scp = fmt.Sprintf("%s - ", info.Scope)
+		}
+		if info.Breaking {
+			msg += " (BREAKING CHANGE)"
+		}
+		groups[info.Type] = append(groups[info.Type], fmt.Sprintf("* %s: %s%s", prefix, scp, msg))
+	}
+	sortMisc(misc)
+	for _, info := range misc {
+		msg := info.Message
+		if info.Scope != "" {
+			msg = fmt.Sprintf("%s: %s", info.Scope, msg)
+		}
+		if info.Breaking {
+			msg += " (BREAKING CHANGE)"
+		}
+		groups["misc"] = append(groups["misc"], fmt.Sprintf("* %s", msg))
 	}
 
 	order := []string{"feat", "fix", "revert", "perf", "refactor", "docs", "style", "test", "build", "ci", "chore"}

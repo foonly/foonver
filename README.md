@@ -20,6 +20,7 @@ Version 1.3.0
   - Multiple formats: Standard **Markdown** and **WordPress `readme.txt`** syntax.
   - Pattern-based insertion: Append or replace changelog sections inside existing files (e.g., between `== Changelog ==` and `== Upgrade Notice ==`) using start and optional end patterns.
   - Automatically filters out version-only commits and those containing `[skip ci]` or `[skip action]`.
+  - Scope-style commits such as `gui: move button` or `cache: flush on settings change` are listed under *Misc*, grouped by scope, instead of each scope getting its own section.
 - **Prerelease Support**: Create and manage prerelease cycles (`alpha`, `beta`, `rc`, etc.) with automatic counter increments, tag transitions, promotion to stable, and smart changelog aggregation.
 
 ## Installation
@@ -199,6 +200,11 @@ changelog-format = "markdown"
 
 # Optional end marker pattern (if omitted and changelog-start is set, overwrites to the end of the file)
 # changelog-end = "== Upgrade Notice =="
+
+# Extra commit types that get their own changelog section. By default, any
+# "prefix: message" commit whose prefix is not a standard conventional commit
+# type (feat, fix, docs, ...) is treated as a scope and listed under Misc.
+# changelog-types = ["deps", "security"]
 
 # Synchronize version in other files (replaces every mention with "version", "v", "ver", or "stable tag" prefix)
 version-sync = ["README.md", "docs/install.md"]
