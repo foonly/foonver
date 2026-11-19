@@ -1,5 +1,11 @@
 # Changelog
 
+### 1.5.1 (2026-11-19)
+
+#### Bug Fixes
+
+- changelog: end the changelog file with a single newline (963e9d8)
+
 ## 1.5.0 (2026-11-19)
 
 #### Features
@@ -343,4 +349,3 @@
 #### Features
 
 - Drew the rest of the owl. (0567ada)
-
