@@ -67,6 +67,14 @@ func GenerateMarkdown(nextVersion string, latestOnly bool) (string, error) {
 
 // GenerateWithFormatter builds a changelog using the given Formatter.
 func GenerateWithFormatter(formatter Formatter, nextVersion string, latestOnly bool, includeDocHeader bool) (string, error) {
+	return generate(formatter, nextVersion, latestOnly, includeDocHeader, nil)
+}
+
+// generate builds the changelog. If existing is non-nil it is the current
+// changelog content: sections for already released tags are taken from it
+// verbatim instead of being regenerated, its preamble is kept, and sections
+// that don't belong to any tag are carried over.
+func generate(formatter Formatter, nextVersion string, latestOnly bool, includeDocHeader bool, existing *string) (string, error) {
 	tags, err := git.GetTags()
 	if err != nil {
 		return "", err
@@ -89,9 +97,29 @@ func GenerateWithFormatter(formatter Formatter, nextVersion string, latestOnly b
 		return false
 	})
 
-	var b strings.Builder
-	if includeDocHeader {
-		b.WriteString(formatter.DocumentHeader())
+	unreleasedTitle := nextVersion
+	if unreleasedTitle == "" {
+		unreleasedTitle = "Unreleased"
+	}
+
+	// Sections "owned" by the generator: every tag (rendered or not) and the
+	// unreleased section. Existing sections with these keys are never carried
+	// over as orphans.
+	owned := map[string]bool{
+		versionKey(unreleasedTitle): true,
+		versionKey("Unreleased"):    true,
+	}
+	for _, tag := range tags {
+		owned[versionKey(tag.Name)] = true
+	}
+
+	var prev *existingLog
+	if existing != nil {
+		known := make(map[string]bool, len(owned))
+		for k := range owned {
+			known[k] = true
+		}
+		prev = parseExisting(formatter, *existing, known)
 	}
 
 	includePrereleases := config.Conf.IncludePrereleases
@@ -124,64 +152,78 @@ func GenerateWithFormatter(formatter Formatter, nextVersion string, latestOnly b
 		}
 	}
 
-	// No tags to render: fall back to full history.
+	// Sections newest-first.
+	var entries []section
+
 	if len(renderedTags) == 0 {
-		title := nextVersion
-		if title == "" {
-			title = "Unreleased"
-		}
-		group, err := generateGroup(formatter, "", title, "")
+		// No tags to render: fall back to full history.
+		group, err := generateGroup(formatter, "", unreleasedTitle, "")
 		if err != nil {
 			return "", err
 		}
-		b.WriteString(group)
-		return b.String(), nil
-	}
-
-	// Include any unreleased changes since the last rendered tag.
-	lastRenderedTag := renderedTags[len(renderedTags)-1]
-	currentTime := time.Now()
-
-	title := "Unreleased"
-	dateNow := ""
-	if nextVersion != "" {
-		title = nextVersion
-		dateNow = currentTime.Format("2006-01-02")
-	}
-	unreleasedCommits, err := filteredCommits(fmt.Sprintf("%s..HEAD", lastRenderedTag.Name), title)
-	if err == nil && len(unreleasedCommits) > 0 {
-		group, err := generateGroup(formatter, fmt.Sprintf("%s..HEAD", lastRenderedTag.Name), title, dateNow)
-		if err == nil {
-			b.WriteString(group)
-			if latestOnly {
-				return b.String(), nil
+		entries = append(entries, section{key: versionKey(unreleasedTitle), text: group})
+	} else {
+		// Include any unreleased changes since the last rendered tag.
+		lastRenderedTag := renderedTags[len(renderedTags)-1]
+		dateNow := ""
+		if nextVersion != "" {
+			dateNow = time.Now().Format("2006-01-02")
+		}
+		unreleasedRange := fmt.Sprintf("%s..HEAD", lastRenderedTag.Name)
+		unreleasedCommits, err := filteredCommits(unreleasedRange, unreleasedTitle)
+		if err == nil && len(unreleasedCommits) > 0 {
+			group, err := generateGroup(formatter, unreleasedRange, unreleasedTitle, dateNow)
+			if err == nil {
+				entries = append(entries, section{key: versionKey(unreleasedTitle), text: group})
 			}
 		}
+
+		// tags are oldest -> newest; render newest -> oldest
+		for i := len(renderedTags) - 1; i >= 0; i-- {
+			if latestOnly && len(entries) > 0 {
+				break
+			}
+			tag := renderedTags[i]
+			key := versionKey(tag.Name)
+
+			if prev != nil {
+				if text, ok := prev.take(key); ok {
+					entries = append(entries, section{key: key, text: text})
+					continue
+				}
+			}
+
+			var revRange string
+			if i == 0 {
+				// First tag: include all commits up to this tag.
+				revRange = tag.Name
+			} else {
+				revRange = fmt.Sprintf("%s..%s", renderedTags[i-1].Name, tag.Name)
+			}
+			group, err := generateGroup(formatter, revRange, tag.Name, tag.Date)
+			if err != nil {
+				return "", err
+			}
+			entries = append(entries, section{key: key, text: group})
+		}
 	}
 
-	// tags are oldest -> newest; render newest -> oldest
-	for i := len(renderedTags) - 1; i >= 0; i-- {
-		tag := renderedTags[i]
+	if prev != nil && !latestOnly {
+		entries = mergeOrphans(entries, prev, owned)
+	}
 
-		var revRange string
-		if i == 0 {
-			// First tag: include all commits up to this tag.
-			revRange = tag.Name
-		} else {
-			prev := renderedTags[i-1]
-			revRange = fmt.Sprintf("%s..%s", prev.Name, tag.Name)
-		}
-		group, err := generateGroup(formatter, revRange, tag.Name, tag.Date)
-		if err != nil {
-			return "", err
-		}
-		b.WriteString(group)
-
+	var b strings.Builder
+	if prev != nil && strings.TrimSpace(prev.preamble) != "" {
+		b.WriteString(normaliseSection(prev.preamble))
+	} else if includeDocHeader {
+		b.WriteString(formatter.DocumentHeader())
+	}
+	for _, e := range entries {
+		b.WriteString(e.text)
 		if latestOnly {
-			return b.String(), nil
+			break
 		}
 	}
-
 	return b.String(), nil
 }
 
@@ -193,11 +235,13 @@ func isPrerelease(tagName string) bool {
 	return v.Prerelease() != ""
 }
 
-// InjectChangelog replaces the changelog section in existing content bounded by startPattern and optional endPattern.
-func InjectChangelog(existing string, changelog string, startPattern string, endPattern string) (string, error) {
+// regionBounds locates the changelog region in existing content: it starts on
+// the line after startPattern and ends right before endPattern (or at the end
+// of the content when endPattern is empty).
+func regionBounds(existing string, startPattern string, endPattern string) (int, int, error) {
 	startIdx := strings.Index(existing, startPattern)
 	if startIdx == -1 {
-		return "", fmt.Errorf("start pattern %q not found in content", startPattern)
+		return 0, 0, fmt.Errorf("start pattern %q not found in content", startPattern)
 	}
 
 	afterStartIdx := startIdx + len(startPattern)
@@ -208,7 +252,25 @@ func InjectChangelog(existing string, changelog string, startPattern string, end
 		afterStartIdx = len(existing)
 	}
 
-	before := strings.TrimRight(existing[:afterStartIdx], "\r\n")
+	if endPattern == "" {
+		return afterStartIdx, len(existing), nil
+	}
+
+	endIdx := strings.Index(existing[afterStartIdx:], endPattern)
+	if endIdx == -1 {
+		return 0, 0, fmt.Errorf("end pattern %q not found after start pattern in content", endPattern)
+	}
+	return afterStartIdx, afterStartIdx + endIdx, nil
+}
+
+// InjectChangelog replaces the changelog section in existing content bounded by startPattern and optional endPattern.
+func InjectChangelog(existing string, changelog string, startPattern string, endPattern string) (string, error) {
+	regionStart, regionEnd, err := regionBounds(existing, startPattern, endPattern)
+	if err != nil {
+		return "", err
+	}
+
+	before := strings.TrimRight(existing[:regionStart], "\r\n")
 	trimmedChangelog := strings.TrimSpace(changelog)
 
 	if endPattern == "" {
@@ -218,13 +280,7 @@ func InjectChangelog(existing string, changelog string, startPattern string, end
 		return before + "\n\n" + trimmedChangelog + "\n", nil
 	}
 
-	rest := existing[afterStartIdx:]
-	endIdx := strings.Index(rest, endPattern)
-	if endIdx == -1 {
-		return "", fmt.Errorf("end pattern %q not found after start pattern in content", endPattern)
-	}
-
-	after := strings.TrimLeft(rest[endIdx:], "\r\n")
+	after := strings.TrimLeft(existing[regionEnd:], "\r\n")
 
 	if trimmedChangelog == "" {
 		return before + "\n\n" + after, nil
@@ -234,50 +290,83 @@ func InjectChangelog(existing string, changelog string, startPattern string, end
 
 // WriteChangelog generates the changelog and writes or injects it into the configured file.
 func WriteChangelog(nextVersion string) (string, error) {
+	filePath, content, err := RenderChangelog(nextVersion)
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		return "", fmt.Errorf("failed to write changelog to %s: %w", filePath, err)
+	}
+	return filePath, nil
+}
+
+// RenderChangelog returns the configured changelog file path and the full
+// content it should have after updating, without writing anything.
+//
+// Unless config.Conf.ChangelogForce is set, sections of already released
+// versions that exist in the file are kept as they are, so manual edits
+// survive. Deleting a section makes it be regenerated.
+func RenderChangelog(nextVersion string) (string, string, error) {
 	format := config.Conf.ChangelogFormat
 	if format == "" {
 		format = "markdown"
 	}
 	formatter, err := GetFormatter(format)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	filePath := path.Join(config.Conf.Info.RootDir, config.Conf.ChangelogFile)
 	startPattern := config.Conf.ChangelogStart
 	endPattern := config.Conf.ChangelogEnd
+	force := config.Conf.ChangelogForce
 
 	if startPattern == "" {
-		content, err := GenerateWithFormatter(formatter, nextVersion, false, true)
+		var existing *string
+		if !force {
+			data, err := os.ReadFile(filePath)
+			if err != nil && !os.IsNotExist(err) {
+				return "", "", fmt.Errorf("failed to read changelog file %s: %w", filePath, err)
+			}
+			if err == nil {
+				str := string(data)
+				existing = &str
+			}
+		}
+		content, err := generate(formatter, nextVersion, false, true, existing)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
-		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-			return "", fmt.Errorf("failed to write changelog to %s: %w", filePath, err)
-		}
-		return filePath, nil
+		return filePath, content, nil
 	}
 
 	existingBytes, err := os.ReadFile(filePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read changelog file %s for pattern replacement: %w", filePath, err)
+		return "", "", fmt.Errorf("failed to read changelog file %s for pattern replacement: %w", filePath, err)
+	}
+	existingContent := string(existingBytes)
+
+	var region *string
+	if !force {
+		regionStart, regionEnd, err := regionBounds(existingContent, startPattern, endPattern)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to update changelog in %s: %w", filePath, err)
+		}
+		r := existingContent[regionStart:regionEnd]
+		region = &r
 	}
 
-	changelogContent, err := GenerateWithFormatter(formatter, nextVersion, false, false)
+	changelogContent, err := generate(formatter, nextVersion, false, false, region)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	updatedContent, err := InjectChangelog(string(existingBytes), changelogContent, startPattern, endPattern)
+	updatedContent, err := InjectChangelog(existingContent, changelogContent, startPattern, endPattern)
 	if err != nil {
-		return "", fmt.Errorf("failed to update changelog in %s: %w", filePath, err)
+		return "", "", fmt.Errorf("failed to update changelog in %s: %w", filePath, err)
 	}
 
-	if err := os.WriteFile(filePath, []byte(updatedContent), 0644); err != nil {
-		return "", fmt.Errorf("failed to write changelog to %s: %w", filePath, err)
-	}
-
-	return filePath, nil
+	return filePath, updatedContent, nil
 }
 
 func generateGroup(formatter Formatter, revRange string, name string, date string) (string, error) {

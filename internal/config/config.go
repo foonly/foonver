@@ -82,6 +82,7 @@ type Config struct {
 	ChangelogStart     string   `mapstructure:"changelog-start"`
 	ChangelogEnd       string   `mapstructure:"changelog-end"`
 	ChangelogTypes     []string `mapstructure:"changelog-types"`
+	ChangelogForce     bool     `mapstructure:"changelog-force"`
 	VersionSync        []string `mapstructure:"version-sync"`
 	ReleaseNotes       string   `mapstructure:"release-notes"`
 	PrintVersion       bool     `mapstructure:"print-version"`
@@ -116,6 +117,7 @@ func Init() {
 	viper.SetDefault("changelog-start", "")
 	viper.SetDefault("changelog-end", "")
 	viper.SetDefault("changelog-types", []string{})
+	viper.SetDefault("changelog-force", false)
 	viper.SetDefault("version-sync", []string{})
 	viper.SetDefault("release-notes", "")
 	viper.SetDefault("print-version", false)
@@ -229,6 +231,10 @@ func processFlags() {
 
 	if viper.IsSet("changelog-end") {
 		Conf.ChangelogEnd = viper.GetString("changelog-end")
+	}
+
+	if viper.IsSet("changelog-force") && viper.GetBool("changelog-force") {
+		Conf.ChangelogForce = true
 	}
 
 	if viper.IsSet("version-sync") {

@@ -55,6 +55,20 @@ type CommitInfo struct {
 type Formatter interface {
 	DocumentHeader() string
 	FormatGroup(name string, date string, commits []string) string
+	// SectionName reports whether line is a version section heading in this
+	// format and, if so, returns the version name it names.
+	SectionName(line string) (string, bool)
+}
+
+var mdSectionRegex = regexp.MustCompile(`^#{2,3}\s+(\S+)(?:\s+\(.*\))?\s*$`)
+var wpSectionRegex = regexp.MustCompile(`^=\s*([^=\s]\S*)(?:\s+\(.*\))?\s*=\s*$`)
+
+func matchSection(re *regexp.Regexp, line string) (string, bool) {
+	m := re.FindStringSubmatch(line)
+	if m == nil {
+		return "", false
+	}
+	return m[1], true
 }
 
 // GetFormatter returns the Formatter implementation for the given format name.
@@ -118,6 +132,10 @@ type MarkdownFormatter struct{}
 
 func (f *MarkdownFormatter) DocumentHeader() string {
 	return "# Changelog\n\n"
+}
+
+func (f *MarkdownFormatter) SectionName(line string) (string, bool) {
+	return matchSection(mdSectionRegex, line)
 }
 
 func (f *MarkdownFormatter) FormatGroup(name string, date string, commits []string) string {
@@ -237,6 +255,10 @@ type WordPressFormatter struct{}
 
 func (f *WordPressFormatter) DocumentHeader() string {
 	return "== Changelog ==\n\n"
+}
+
+func (f *WordPressFormatter) SectionName(line string) (string, bool) {
+	return matchSection(wpSectionRegex, line)
 }
 
 func (f *WordPressFormatter) FormatGroup(name string, date string, commits []string) string {

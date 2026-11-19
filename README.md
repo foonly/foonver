@@ -19,6 +19,7 @@ Version 1.3.0
   - Categorizes commits and automatically updates `CHANGELOG.md` (or any custom file).
   - Multiple formats: Standard **Markdown** and **WordPress `readme.txt`** syntax.
   - Pattern-based insertion: Append or replace changelog sections inside existing files (e.g., between `== Changelog ==` and `== Upgrade Notice ==`) using start and optional end patterns.
+  - Manual edits to released versions are preserved on regeneration; delete a section to regenerate it, or use `--force` to regenerate everything.
   - Automatically filters out version-only commits and those containing `[skip ci]` or `[skip action]`.
   - Scope-style commits such as `gui: move button` or `cache: flush on settings change` are listed under *Misc*, grouped by scope, instead of each scope getting its own section.
 - **Prerelease Support**: Create and manage prerelease cycles (`alpha`, `beta`, `rc`, etc.) with automatic counter increments, tag transitions, promotion to stable, and smart changelog aggregation.
@@ -126,7 +127,23 @@ foonver changelog --latest
 
 # Generate in WordPress readme.txt format
 foonver changelog --format wordpress
+
+# Update the changelog file in place (keeps existing sections)
+foonver changelog --write
+
+# Regenerate every section from git, discarding manual edits
+foonver changelog --write --force
 ```
+
+#### Editing the changelog
+
+When the changelog file is updated (on release, or with `changelog --write`), sections of already released versions that exist in the file are kept exactly as they are. You can reword entries, fix dates or add notes, and the edits survive later releases. Text before the first version heading is kept too.
+
+- **Regenerate one version:** delete its section from the file and run `foonver changelog --write`.
+- **Regenerate everything:** pass `--force` to `changelog --write`, `--changelog-force` to any release command, or set `changelog-force = true`.
+- The section for the version being released (or `Unreleased`) is always regenerated.
+- Sections for versions that have no git tag, such as history from before you used foonver, are kept in version order.
+- Headings are matched by version, so `## 1.2.0` and `## v1.2.0 (2026-01-01)` both count as the section for tag `v1.2.0`.
 
 Supported formats:
 
@@ -205,6 +222,10 @@ changelog-format = "markdown"
 # "prefix: message" commit whose prefix is not a standard conventional commit
 # type (feat, fix, docs, ...) is treated as a scope and listed under Misc.
 # changelog-types = ["deps", "security"]
+
+# Regenerate every changelog section instead of keeping existing ones
+# (manual edits to released versions are lost)
+changelog-force = false
 
 # Synchronize version in other files (replaces every mention with "version", "v", "ver", or "stable tag" prefix)
 version-sync = ["README.md", "docs/install.md"]
