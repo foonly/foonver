@@ -337,6 +337,9 @@ func RenderChangelog(nextVersion string) (string, string, error) {
 		if err != nil {
 			return "", "", err
 		}
+		// Sections end with a blank line as a separator; the file itself
+		// should end with exactly one newline.
+		content = strings.TrimRight(content, " \t\r\n") + "\n"
 		return filePath, content, nil
 	}
 

@@ -59,6 +59,13 @@ func readFile(t *testing.T, p string) string {
 	return string(b)
 }
 
+func assertSingleTrailingNewline(t *testing.T, content string) {
+	t.Helper()
+	if !strings.HasSuffix(content, "\n") || strings.HasSuffix(content, "\n\n") {
+		t.Errorf("expected content to end with exactly one newline, got tail %q", content[max(0, len(content)-20):])
+	}
+}
+
 func TestParseExistingSections(t *testing.T) {
 	content := "# Changelog\n\nSome intro.\n\n## Notes heading that is not a version\n\n" +
 		"## v1.1.0 (2026-01-02)\n\n#### Features\n\n- a (abc)\n\n" +
@@ -100,6 +107,7 @@ func TestWriteChangelogPreservesEdits(t *testing.T) {
 		t.Fatalf("initial write failed: %v", err)
 	}
 	initial := readFile(t, path)
+	assertSingleTrailingNewline(t, initial)
 	for _, want := range []string{"first feature", "second fix", "third feature"} {
 		if !strings.Contains(initial, want) {
 			t.Fatalf("expected %q in initial changelog:\n%s", want, initial)
@@ -121,6 +129,7 @@ func TestWriteChangelogPreservesEdits(t *testing.T) {
 		t.Fatalf("preserving write failed: %v", err)
 	}
 	got := readFile(t, path)
+	assertSingleTrailingNewline(t, got)
 
 	checks := []string{
 		"All notable changes.",
@@ -168,6 +177,7 @@ func TestWriteChangelogPreservesEdits(t *testing.T) {
 		t.Fatal(err)
 	}
 	forced := readFile(t, path)
+	assertSingleTrailingNewline(t, forced)
 	for _, unwanted := range []string{"All notable changes.", "Hand-written", "Edited first release", "0.9.0"} {
 		if strings.Contains(forced, unwanted) {
 			t.Errorf("forced write kept %q:\n%s", unwanted, forced)
