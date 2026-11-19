@@ -81,6 +81,7 @@ type Config struct {
 	ChangelogFormat    string   `mapstructure:"changelog-format"`
 	ChangelogStart     string   `mapstructure:"changelog-start"`
 	ChangelogEnd       string   `mapstructure:"changelog-end"`
+	ChangelogTypes     []string `mapstructure:"changelog-types"`
 	VersionSync        []string `mapstructure:"version-sync"`
 	ReleaseNotes       string   `mapstructure:"release-notes"`
 	PrintVersion       bool     `mapstructure:"print-version"`
@@ -114,6 +115,7 @@ func Init() {
 	viper.SetDefault("changelog-format", "markdown")
 	viper.SetDefault("changelog-start", "")
 	viper.SetDefault("changelog-end", "")
+	viper.SetDefault("changelog-types", []string{})
 	viper.SetDefault("version-sync", []string{})
 	viper.SetDefault("release-notes", "")
 	viper.SetDefault("print-version", false)

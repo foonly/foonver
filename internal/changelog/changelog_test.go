@@ -169,7 +169,7 @@ func TestWordPressFormatter(t *testing.T) {
 		"= v1.0.0 (2026-09-21) =",
 		"* Feature: core - major feature (BREAKING CHANGE)",
 		"* Fix: resolve bug",
-		"* Custom: something special",
+		"* custom: something special",
 		"* misc non-conventional message",
 	}
 
@@ -350,4 +350,57 @@ func TestGenerateMarkdown_Prerelease(t *testing.T) {
 			t.Errorf("expected upgrade notice preserved, got:\n%s", strContent)
 		}
 	})
+}
+
+func TestParseCommitScopes(t *testing.T) {
+	orig := config.Conf.ChangelogTypes
+	defer func() { config.Conf.ChangelogTypes = orig }()
+	config.Conf.ChangelogTypes = []string{"deps"}
+
+	tests := []struct {
+		in       string
+		typ      string
+		scope    string
+		msg      string
+		breaking bool
+	}{
+		{"a1 feat(ui): add button", "feat", "ui", "add button", false},
+		{"a1 Fix: crash", "fix", "", "crash", false},
+		{"a1 gui: moving button", "misc", "gui", "moving button", false},
+		{"a1 cache: flush cache on setting change", "misc", "cache", "flush cache on setting change", false},
+		{"a1 api-client!: drop v1 endpoints", "misc", "api-client", "drop v1 endpoints", true},
+		{"a1 ui/button: fix padding", "misc", "ui/button", "fix padding", false},
+		{"a1 deps: bump foo", "deps", "", "bump foo", false},
+		{"a1 just a plain message", "misc", "", "just a plain message", false},
+		{"a1 see https://example.com", "misc", "", "see https://example.com", false},
+	}
+	for _, tt := range tests {
+		got := parseCommit(tt.in)
+		if got.Type != tt.typ || got.Scope != tt.scope || got.Message != tt.msg || got.Breaking != tt.breaking {
+			t.Errorf("parseCommit(%q) = %+v, want type=%q scope=%q msg=%q breaking=%v",
+				tt.in, got, tt.typ, tt.scope, tt.msg, tt.breaking)
+		}
+	}
+}
+
+func TestMarkdownScopedMisc(t *testing.T) {
+	md := &MarkdownFormatter{}
+	commits := []string{
+		"aaa1111 plain message",
+		"bbb2222 gui: moving button",
+		"ccc3333 feat: new thing",
+		"ddd4444 cache: flush cache on setting change",
+		"eee5555 gui: recolor header",
+	}
+	got := md.FormatGroup("v1.0.0", "", commits)
+	want := "## v1.0.0\n\n" +
+		"#### Features\n\n- new thing (ccc3333)\n\n" +
+		"#### Misc\n\n" +
+		"- cache: flush cache on setting change (ddd4444)\n" +
+		"- gui: moving button (bbb2222)\n" +
+		"- gui: recolor header (eee5555)\n" +
+		"- plain message (aaa1111)\n\n"
+	if got != want {
+		t.Errorf("unexpected markdown output:\n%s\nwant:\n%s", got, want)
+	}
 }
